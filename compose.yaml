@@ -14,7 +14,3 @@ services:
     privileged: true 
     tty: true
     command: /bin/bash
-
-
-volumes:
-  snowball:
