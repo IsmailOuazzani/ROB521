@@ -12,6 +12,7 @@ import random
 from typing import Tuple
 
 NODE_CLOSENESS_TOL = 0.01
+ITERATIONS = 500
 
 def load_map(filename):
     im = mpimg.imread("../maps/" + filename)
@@ -84,10 +85,10 @@ class PathPlanner:
     #Functions required for RRT
     def sample_map_space(self) -> np.ndarray:
         #Return an [x,y] coordinate to drive the robot towards
-        random_x = random.random() * (self.bounds[0,1] - self.bounds[0,0])
-        random_y = random.random() * (self.bounds[1,1] - self.bounds[1,0])
+        random_x = np.random.uniform(self.bounds[0,0], self.bounds[0,1])
+        random_y = np.random.uniform(self.bounds[1,1], self.bounds[1,0])
         return np.array([[random_x],[random_y]])
-    
+
     def check_if_duplicate(self, point: np.ndarray) -> bool:
         #Check if point is a duplicate of an already existing node
         for node in self.nodes:
@@ -202,12 +203,29 @@ class PathPlanner:
         #Given a node_id with a changed cost, update all connected nodes with the new cost
         print("TO DO: Update the costs of connected nodes after rewiring.")
         return
+    # def collision_checking(self, robot_traj):
+    #     # Check if the robot trajectory collides with the map
+        
+    #     # Transform points to robot pixel coors
+    #     coords = self.points_to_robot_circle(robot_traj[:2, :]).reshape(2, -1) # disregard orientation
 
+    #     col_indices, row_indices = footprint_coords[0], footprint_coords[1]
+
+    #     # Ensure indices are within bounds
+    #     valid_mask = (row_indices >= 0) & (row_indices < self.occupancy_map.shape[0]) & \
+    #                 (col_indices >= 0) & (col_indices < self.occupancy_map.shape[1])
+        
+    #     # Filter out-of-bounds indices
+    #     row_indices, col_indices = row_indices[valid_mask], col_indices[valid_mask]
+
+    #     # Check if any footprint pixels are occupied
+    #     return np.any(self.occupancy_map[row_indices, col_indices] == False)
+                      
     #Planner Functions
     def rrt_planning(self):
         #This function performs RRT on the given map and robot
         #You do not need to demonstrate this function to the TAs, but it is left in for you to check your work
-        for i in range(1): #Most likely need more iterations than this to complete the map!
+        for i in range(ITERATIONS): #Most likely need more iterations than this to complete the map!
             #Sample map space
             point = self.sample_map_space()
             
@@ -220,6 +238,7 @@ class PathPlanner:
 
             #Check for collisions
             print("TO DO: Check for collisions and add safe points to list of nodes.")
+
             
             #Check if goal has been reached
             print("TO DO: Check if at goal point.")
