@@ -73,6 +73,13 @@ def test_point_to_cell():
     mapped_pt = PLANNER.point_to_cell(np.array([[0],[0]]))
     assert np.array_equal(mapped_pt, origin.astype(int))
 
+def test_cost_to_come():
+    trajectory = np.array([
+        [0, 1, 2, 3, 4],
+        [0, 0, 0, 0, 0]
+    ])
+    assert PLANNER.cost_to_go(trajectory) == 4
+
 def test_sample_map_space():
     xrange = [PLANNER.bounds[0,0],PLANNER.bounds[0,1]]
     yrange = [PLANNER.bounds[1,0],PLANNER.bounds[1,1]]

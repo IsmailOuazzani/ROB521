@@ -194,10 +194,13 @@ class PathPlanner:
         print("TO DO: Implement a way to connect two already existing nodes (for rewiring).")
         return np.zeros((3, self.num_substeps))
     
-    def cost_to_come(self, trajectory_o):
+    @staticmethod
+    def cost_to_go(trajectory_o: np.ndarray) -> float:
         #The cost to get to a node from lavalle 
-        print("TO DO: Implement a cost to come metric")
-        return 0
+        cost = 0.0
+        for i in range(1, trajectory_o.shape[1]):
+            cost += np.linalg.norm(trajectory_o[:2, i] - trajectory_o[:2, i-1])
+        return cost
     
     def update_children(self, node_id):
         #Given a node_id with a changed cost, update all connected nodes with the new cost
@@ -229,19 +232,25 @@ class PathPlanner:
             #Sample map space
             point = self.sample_map_space()
             
-
             #Get the closest point
             closest_node_id = self.closest_node(point)
+            closest_node = self.nodes[closest_node_id]
 
             #Simulate driving the robot towards the closest point
-            trajectory_o = self.simulate_trajectory(self.nodes[closest_node_id].point, point)
+            trajectory_o = self.simulate_trajectory(closest_node, point)
 
             #Check for collisions
-            print("TO DO: Check for collisions and add safe points to list of nodes.")
 
+            # Update graph
+            cost_of_trajectory = self.cost_to_go(trajectory_o)
+            cost_to_come = closest_node.cost + cost_of_trajectory
+            new_node = Node(robot_pose=trajectory_o[:,-1], parent_id=closest_node_id, cost=cost_to_come)
+            self.nodes.append(new_node)
             
             #Check if goal has been reached
-            print("TO DO: Check if at goal point.")
+            if np.linalg.norm(new_node.robot_pose[:2] - self.goal_point) < self.stopping_dist:
+                return self.nodes
+            
         return self.nodes
     
     def rrt_star_planning(self):
