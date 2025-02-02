@@ -95,10 +95,16 @@ class PathPlanner:
                 return True
         return False
     
-    def closest_node(self, point):
+    def closest_node(self, point: np.ndarray) -> int:
         #Returns the index of the closest node
-        print("TO DO: Implement a method to get the closest node to a sapled point")
-        return 0
+        closest_node = None
+        closest_dist = np.inf
+        for i, node in enumerate(self.nodes):
+            dist = np.linalg.norm(node.robot_pose[:2] - point)
+            if dist < closest_dist:
+                closest_dist = dist
+                closest_node = i
+        return closest_node
     
     def simulate_trajectory(self, node_i, point_s):
         #Simulates the non-holonomic motion of the robot.

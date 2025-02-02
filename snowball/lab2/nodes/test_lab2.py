@@ -48,6 +48,25 @@ def test_duplicate_nodes():
     node.robot_pose[0] = np.inf
     assert PLANNER.check_if_duplicate(point) is False
 
+def test_get_nearest_node():
+    node1 = Node(
+        robot_pose=np.array([[10],[25],[np.pi/2]]),
+        parent_id=None,
+        cost=0
+    )
+    node2 = Node(
+        robot_pose=np.array([[20],[25],[np.pi/2]]),
+        parent_id=None,
+        cost=0
+    )
+    PLANNER.nodes = [node1, node2]
+
+    point1 = np.array([[9], [26]])
+    assert PLANNER.closest_node(point1) == 0
+
+    point2 = np.array([[19], [25]])
+    assert PLANNER.closest_node(point2) == 1
+
 def test_point_to_cell():
     origin = PLANNER.map_settings_dict["origin"][:2]
     origin = np.array([[origin[0]], [origin[1]]])
