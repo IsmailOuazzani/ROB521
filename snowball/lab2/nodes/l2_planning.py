@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-#Standard Libraries
 import numpy as np
 import yaml
 import pygame
@@ -11,6 +10,7 @@ from scipy.linalg import block_diag
 from math import cos, sin, acos
 import random
 
+NODE_CLOSENESS_TOL = 0.01
 
 def load_map(filename):
     im = mpimg.imread("../maps/" + filename)
@@ -88,9 +88,11 @@ class PathPlanner:
 
         return np.array([[random_x],[random_y]])
     
-    def check_if_duplicate(self, point):
+    def check_if_duplicate(self, point: np.ndarray) -> bool:
         #Check if point is a duplicate of an already existing node
-        print("TO DO: Check that nodes are not duplicates")
+        for node in self.nodes:
+            if np.allclose(node.robot_pose[:2], point, atol=NODE_CLOSENESS_TOL):
+                return True
         return False
     
     def closest_node(self, point):

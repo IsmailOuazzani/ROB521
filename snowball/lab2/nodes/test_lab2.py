@@ -1,5 +1,6 @@
 from .l2_planning import PathPlanner, Node
 import numpy as np
+from copy import deepcopy
 
 PLANNER = PathPlanner(
         map_filename="myhal.png",
@@ -39,6 +40,13 @@ def test_simulatee_traj():
     )
     point = np.array([[1], [0]])
     PLANNER.simulate_trajectory(node_i=node, point_s=point)
+
+def test_duplicate_nodes():
+    node = deepcopy(PLANNER.nodes[0]) # to modify if the planner isnt initialised with a first node anymore
+    point = node.robot_pose[:2]
+    assert PLANNER.check_if_duplicate(point) is True
+    node.robot_pose[0] = np.inf
+    assert PLANNER.check_if_duplicate(point) is False
 
 def test_point_to_cell():
     origin = PLANNER.map_settings_dict["origin"][:2]
