@@ -1,0 +1,7 @@
+numpy 
+pyyaml 
+pygame 
+matplotlib 
+scipy 
+scikit-image
+pytest
