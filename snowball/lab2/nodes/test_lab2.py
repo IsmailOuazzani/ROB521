@@ -87,3 +87,28 @@ def test_sample_map_space():
     print(sample,xrange,yrange)
     assert xrange[1] >= sample[0] >= xrange[0]
     assert yrange[1] >= sample[1] >= yrange[0]
+
+def test_collision_detected():
+    test_traj = np.array([ # black box
+        [ 800.], 
+        [ 400.],
+        [ 0.]
+    ])
+
+    assert PLANNER.collision_detected(test_traj) == True
+
+    test_traj = np.array([ # white
+        [ 300.], 
+        [ 400.],
+        [ 0.]
+    ])
+
+    assert PLANNER.collision_detected(test_traj) == False
+
+    test_traj = np.array([ # black box
+        [ 300., 800.], 
+        [ 400., 400.],
+        [0., 0.]
+    ])
+
+    assert PLANNER.collision_detected(test_traj) == True

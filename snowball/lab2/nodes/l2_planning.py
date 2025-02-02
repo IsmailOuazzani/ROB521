@@ -178,7 +178,7 @@ class PathPlanner:
         for pt in range(mapped_pts.shape[1]):
             rr, cc = disk(radius=self.robot_radius, center=mapped_pts[:,pt])
             all_points.append(np.vstack((cc,rr)))
-        return np.dstack(all_points)    
+        return np.hstack(all_points)    
 
     #RRT* specific functions
     def ball_radius(self):
@@ -206,24 +206,13 @@ class PathPlanner:
         #Given a node_id with a changed cost, update all connected nodes with the new cost
         print("TO DO: Update the costs of connected nodes after rewiring.")
         return
-    # def collision_checking(self, robot_traj):
-    #     # Check if the robot trajectory collides with the map
-        
-    #     # Transform points to robot pixel coors
-    #     coords = self.points_to_robot_circle(robot_traj[:2, :]).reshape(2, -1) # disregard orientation
+    
+    def collision_detected(self, robot_traj: np.ndarray) -> bool:
+        # Check if the robot trajectory collides with the map
+        coords = self.points_to_robot_circle(robot_traj[:2, :]).reshape(2,-1)
+        col_indices, row_indices = coords[1], coords[0]
+        return np.any(self.occupancy_map[row_indices, col_indices] == 0)
 
-    #     col_indices, row_indices = footprint_coords[0], footprint_coords[1]
-
-    #     # Ensure indices are within bounds
-    #     valid_mask = (row_indices >= 0) & (row_indices < self.occupancy_map.shape[0]) & \
-    #                 (col_indices >= 0) & (col_indices < self.occupancy_map.shape[1])
-        
-    #     # Filter out-of-bounds indices
-    #     row_indices, col_indices = row_indices[valid_mask], col_indices[valid_mask]
-
-    #     # Check if any footprint pixels are occupied
-    #     return np.any(self.occupancy_map[row_indices, col_indices] == False)
-                      
     #Planner Functions
     def rrt_planning(self):
         #This function performs RRT on the given map and robot
@@ -262,10 +251,10 @@ class PathPlanner:
             #Closest Node
             closest_node_id = self.closest_node(point)
 
-            #Simulate trajectory
+           #Simulate driving the robot towards the closest point
             trajectory_o = self.simulate_trajectory(self.nodes[closest_node_id].point, point)
 
-            #Check for Collision
+            #Check for collisions
             print("TO DO: Check for collision.")
 
             #Last node rewire
