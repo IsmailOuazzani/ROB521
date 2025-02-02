@@ -9,6 +9,7 @@ from skimage.draw import disk
 from scipy.linalg import block_diag
 from math import cos, sin, acos
 import random
+from typing import Tuple
 
 NODE_CLOSENESS_TOL = 0.01
 
@@ -83,9 +84,8 @@ class PathPlanner:
     #Functions required for RRT
     def sample_map_space(self) -> np.ndarray:
         #Return an [x,y] coordinate to drive the robot towards
-        random_x = random.random() * (self.map_shape[0,1] - self.map_shape[0,0])
-        random_y = random.random() * (self.map_shape[1,1] - self.map_shape[1,0])
-
+        random_x = random.random() * (self.bounds[0,1] - self.bounds[0,0])
+        random_y = random.random() * (self.bounds[1,1] - self.bounds[1,0])
         return np.array([[random_x],[random_y]])
     
     def check_if_duplicate(self, point: np.ndarray) -> bool:
@@ -116,7 +116,7 @@ class PathPlanner:
         robot_traj = self.trajectory_rollout(vel, rot_vel)
         return robot_traj
     
-    def robot_controller(self, node_i: Node, point_s: np.ndarray) -> tuple[float,float]:
+    def robot_controller(self, node_i: Node, point_s: np.ndarray) -> Tuple[float,float]:
         #This controller determines the velocities that will nominally move the robot from node i to node s
         #Max velocities should be enforced
 

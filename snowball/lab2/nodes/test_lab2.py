@@ -72,3 +72,11 @@ def test_point_to_cell():
     origin = np.array([[origin[0]], [origin[1]]])
     mapped_pt = PLANNER.point_to_cell(np.array([[0],[0]]))
     assert np.array_equal(mapped_pt, origin.astype(int))
+
+def test_sample_map_space():
+    xrange = [PLANNER.bounds[0,0],PLANNER.bounds[0,1]]
+    yrange = [PLANNER.bounds[1,0],PLANNER.bounds[1,1]]
+    sample = PLANNER.sample_map_space()
+    print(sample,xrange,yrange)
+    assert xrange[1] >= sample[0] >= xrange[0]
+    assert yrange[1] >= sample[1] >= yrange[0]
