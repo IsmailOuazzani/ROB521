@@ -9,11 +9,15 @@ RUN apt-get install -y git tmux ros-noetic-joy ros-noetic-teleop-twist-joy \
     ros-noetic-move-base ros-noetic-urdf ros-noetic-xacro \
     ros-noetic-compressed-image-transport ros-noetic-rqt* \
     ros-noetic-rviz ros-noetic-gmapping \
-    ros-noetic-navigation ros-noetic-interactive-markers 
+    ros-noetic-navigation ros-noetic-interactive-markers \
+    python3-pip
 
 RUN apt-get install -y ros-noetic-dynamixel-sdk \
                 ros-noetic-turtlebot3-msgs \
                 ros-noetic-turtlebot3
+
+COPY ./requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 RUN mkdir -p /home/catkin_ws/src
 WORKDIR /home/catkin_ws

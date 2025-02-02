@@ -39,3 +39,9 @@ def test_simulatee_traj():
     )
     point = np.array([[1], [0]])
     PLANNER.simulate_trajectory(node_i=node, point_s=point)
+
+def test_point_to_cell():
+    origin = PLANNER.map_settings_dict["origin"][:2]
+    origin = np.array([[origin[0]], [origin[1]]])
+    mapped_pt = PLANNER.point_to_cell(np.array([[0],[0]]))
+    assert np.array_equal(mapped_pt, origin.astype(int))

@@ -9,6 +9,7 @@ import matplotlib.image as mpimg
 from skimage.draw import disk
 from scipy.linalg import block_diag
 from math import cos, sin, acos
+import random
 
 
 def load_map(filename):
@@ -80,10 +81,12 @@ class PathPlanner:
         return
 
     #Functions required for RRT
-    def sample_map_space(self):
+    def sample_map_space(self) -> np.ndarray:
         #Return an [x,y] coordinate to drive the robot towards
-        print("TO DO: Sample point to drive towards")
-        return np.zeros((2, 1))
+        random_x = random.random() * (self.map_shape[0,1] - self.map_shape[0,0])
+        random_y = random.random() * (self.map_shape[1,1] - self.map_shape[1,0])
+
+        return np.array([[random_x],[random_y]])
     
     def check_if_duplicate(self, point):
         #Check if point is a duplicate of an already existing node
@@ -139,18 +142,34 @@ class PathPlanner:
 
         return rollout
     
-    def point_to_cell(self, point):
+    def point_to_cell(self, point: np.ndarray) -> np.ndarray:
         #Convert a series of [x,y] points in the map to the indices for the corresponding cell in the occupancy map
         #point is a 2 by N matrix of points of interest
-        print("TO DO: Implement a method to get the map cell the robot is currently occupying")
-        return 0
+        c = self.map_settings_dict["resolution"]
+        k = np.array([
+            [c, 0, self.bounds[0,0]],
+            [0, c, self.bounds[1,0]],
+            [0, 0, 1]
+        ])
+        num_points = point.shape[1]
+        ones = np.ones((1,num_points))
+        homo_point = np.vstack((point,ones))
 
-    def points_to_robot_circle(self, points):
+        transformed = k @ homo_point
+        x_normalized = transformed[0, :] / transformed[2, :]
+        y_normalized = transformed[1, :] / transformed[2, :]
+        cell_indices = np.vstack((x_normalized, y_normalized))
+        return cell_indices.astype(int)
+
+    def points_to_robot_circle(self, points: np.ndarray) -> np.ndarray:
         #Convert a series of [x,y] points to robot map footprints for collision detection
         #Hint: The disk function is included to help you with this function
-        print("TO DO: Implement a method to get the pixel locations of the robot path")
-        return [], []
-    #Note: If you have correctly completed all previous functions, then you should be able to create a working RRT function
+        all_points = []
+        mapped_pts = self.point_to_cell(points)
+        for pt in range(mapped_pts.shape[1]):
+            rr, cc = disk(radius=self.robot_radius, center=mapped_pts[:,pt])
+            all_points.append(np.vstack((cc,rr)))
+        return np.dstack(all_points)    
 
     #RRT* specific functions
     def ball_radius(self):
@@ -183,6 +202,7 @@ class PathPlanner:
         for i in range(1): #Most likely need more iterations than this to complete the map!
             #Sample map space
             point = self.sample_map_space()
+            
 
             #Get the closest point
             closest_node_id = self.closest_node(point)
