@@ -119,14 +119,34 @@ class PathPlanner:
     def point_to_cell(self, point):
         #Convert a series of [x,y] points in the map to the indices for the corresponding cell in the occupancy map
         #point is a 2 by N matrix of points of interest
-        print("TO DO: Implement a method to get the map cell the robot is currently occupying")
-        return 0
+        c = self.map_settings_dict["resolution"]
+        k = np.array([
+            [c, 0, self.bounds[0,0]],
+            [0, c, self.bounds[1,0]],
+            [0, 0, 1]
+        ])
+        num_points = point.shape[1]
+        ones = np.ones((1,num_points))
+        homo_point = np.vstack((point,ones))
+
+        transformed = k @ homo_point
+        x_normalized = transformed[0, :] / transformed[2, :]
+        y_normalized = transformed[1, :] / transformed[2, :]
+        cell_indices = np.vstack((x_normalized, y_normalized))
+        return cell_indices.astype(int)
+
 
     def points_to_robot_circle(self, points):
         #Convert a series of [x,y] points to robot map footprints for collision detection
         #Hint: The disk function is included to help you with this function
-        print("TO DO: Implement a method to get the pixel locations of the robot path")
-        return [], []
+        all_points = []
+        mapped_pts = self.point_to_cell(points)
+        for pt in range(mapped_pts.shape[1]):
+            rr, cc = disk(radius=self.robot_radius, center=mapped_pts[:,pt])
+            print(rr,cc)
+            all_points.append(np.vstack((cc,rr)))
+        return np.dstack(all_points)      
+
     #Note: If you have correctly completed all previous functions, then you should be able to create a working RRT function
 
     #RRT* specific functions
@@ -219,6 +239,9 @@ def main():
 
     #RRT precursor
     path_planner = PathPlanner(map_filename, map_setings_filename, goal_point, stopping_dist)
+    # Test task1
+    mapped_pt = path_planner.points_to_robot_circle(np.array([[0],[0]]))
+
     nodes = path_planner.rrt_star_planning()
     node_path_metric = np.hstack(path_planner.recover_path())
 
