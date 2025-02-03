@@ -136,7 +136,7 @@ class PathPlanner:
         self.nodes = [Node(np.zeros((3,1)), -1, 0)]
 
         # Sampler
-        self.sampler = SlidingWindowSampler((50,65), (10, 10), overlap=0.5, total_samples=int(5000))
+        self.sampler = SlidingWindowSampler((50,70), (10, 10), overlap=0.2, total_samples=int(4000))
         self.sampler2 = SlidingWindowSampler((50,60), (10, 10), overlap=0.25, total_samples=int(4000), switch=True)
         self.sampler3 = SlidingWindowSampler((50,60), (2, 2), overlap=0.15, total_samples=int(4000))
 
@@ -178,7 +178,12 @@ class PathPlanner:
 
         if self.samples_so_far < self.sampler.total_samples:
             return self.sampler.sample() + np.array([[-5], [15]])
-        elif self.samples_so_far < self.sampler2.total_samples + self.sampler.total_samples:
+        elif self.samples_so_far < self.sampler.total_samples + 500:
+            # sample in the goal region
+            random_x = np.random.uniform(self.goal_point[0] - 10,self. goal_point[0] + 10)
+            random_y = np.random.uniform(self.goal_point[1] - 10, self.goal_point[1] + 10)
+            return np.array([[random_x], [random_y]])
+        elif self.samples_so_far < self.sampler2.total_samples + self.sampler.total_samples + 500:
             return self.sampler2.sample() + np.array([[-5], [15]])
         else:
             return self.sampler3.sample() + np.array([[-5], [15]])
@@ -204,6 +209,30 @@ class PathPlanner:
                 closest_dist = cost
                 closest_node = i
         return closest_node
+
+    def nodes_within_radius(self, point: np.ndarray, radius: float) -> np.ndarray:
+        #Returns the indices of the nodes within a certain radius
+        nodes_within_radius = []
+        for i, node in enumerate(self.nodes):
+            dist = np.linalg.norm(node.robot_pose[:2] - point)
+            angle_to_target = np.arctan2(point[1] - node.robot_pose[1], point[0] - node.robot_pose[0])
+            angle_diff = np.arctan2(np.sin(angle_to_target - node.robot_pose[2]), np.cos(angle_to_target - node.robot_pose[2]))
+            cost = dist #+ 1.5*abs(angle_diff)
+            if cost < radius:
+                nodes_within_radius.append(i)
+        return nodes_within_radius
+
+    def k_closest_nodes(self, point: np.ndarray, k: int) -> np.ndarray:
+        #Returns the indices of the k closest nodes
+        closest_nodes = []
+        for i, node in enumerate(self.nodes):
+            dist = np.linalg.norm(node.robot_pose[:2] - point)
+            angle_to_target = np.arctan2(point[1] - node.robot_pose[1], point[0] - node.robot_pose[0])
+            angle_diff = np.arctan2(np.sin(angle_to_target - node.robot_pose[2]), np.cos(angle_to_target - node.robot_pose[2]))
+            cost = dist + 1.5*abs(angle_diff)
+            closest_nodes.append((i, cost))
+        closest_nodes.sort(key=lambda x: x[1])
+        return [node[0] for node in closest_nodes[:k]]
     
     def simulate_trajectory(self, node_i: Node, point_s: np.ndarray) -> np.ndarray:
         #Simulates the non-holonomic motion of the robot.
@@ -329,62 +358,72 @@ class PathPlanner:
             #     self.window.add_point(point[:2].flatten(), radius = 2, color=(0,0,255))
             
             #Get the closest point
-            closest_node_id = self.closest_node(point)
-            closest_node = self.nodes[closest_node_id]
+            # closest_node_id = self.closest_node(point)
+            # closest_node = self.nodes[closest_node_id]
+            closest_node_ids = self.k_closest_nodes(point, 5)
+            for closest_node_id in closest_node_ids:
+                closest_node = self.nodes[closest_node_id]
 
-            #Simulate driving the robot towards the closest point
-            trajectory_o = self.simulate_trajectory(closest_node, point)
-            # Test for collision
-            if self.collision_detected(trajectory_o):
-                if not self.headless:
-                    # print("Collision Detected!")
-                    # find first collision point
-                    # for i in range(1, trajectory_o.shape[1]):
-                    #     if self.collision_detected(trajectory_o[:,:i]):
-                    #         # set the trajectory to the point before the collision
-                    #         trajectory_o[:,i:] = trajectory_o[:,i-1].reshape(3,1)
-                    #         break
-                    # for i in range(1, trajectory_o.shape[1]):
-                    #     self.window.add_point(trajectory_o[:2,i], radius=2, color=(255,0,0))
+                #Simulate driving the robot towards the closest point
+                trajectory_o = self.simulate_trajectory(closest_node, point)
+                # Test for collision
+                if self.collision_detected(trajectory_o):
                     continue
-            # plot trajectory
+                    # if not self.headless:
+                    #     # print("Collision Detected!")
+                    #     # # find first collision point
+                    #     # for i in range(1, trajectory_o.shape[1]):
+                    #     #     if self.collision_detected(trajectory_o[:,:i]):
+                    #     #         # set the trajectory to the point before the collision
+                    #     #         trajectory_o[:,i:] = trajectory_o[:,i-1].reshape(3,1)
+                    #     #         break
+                    #     # trajectory_o = trajectory_o[:,2:] = trajectory_o[:,1].reshape(3,1)
+                    #     # for i in range(1, trajectory_o.shape[1]):
+                    #     #     self.window.add_point(trajectory_o[:2,i], radius=2, color=(255,0,0))
+                        
+                
+                # # ADD TRANSLATION FROM LAST THING
+                # if not self.headless:
+                #     plt.imshow(self.occupancy_map)
+                #     # plot sampled point
+                #     self.window.add_point(point.flatten(), radius=5, color=(0,0,255))
 
-            if not self.headless:
-                for i in range(1, trajectory_o.shape[1]):
-                    self.window.add_point(trajectory_o[:2,i], radius=2, color=(0,255,0))
-            # # ADD TRANSLATION FROM LAST THING
-            # if not self.headless:
-            #     plt.imshow(self.occupancy_map)
-            #     # plot sampled point
-            #     self.window.add_point(point.flatten(), radius=5, color=(0,0,255))
+                #     point = self.point_to_cell(point.reshape(2,1))
+                #     plt.scatter(point[0], point[1], color='b')
+                #     for i in range(1, trajectory_o.shape[1]):
+                #         # print(f"Trajectory point: {trajectory_o[:2,i]}")
+                #         point_image_space = self.point_to_cell(trajectory_o[:2,i].reshape(2,1))
+                #         plt.scatter(point_image_space[0], point_image_space[1], color='r')
+                #         # print(f"Trajectory point in image space: {point_image_space}")
+                #         self.window.add_point(trajectory_o[:2,i], radius=5, color=(255,0,0))
+                #         # self.window.add_point_image_space(point_image_space, radius=5, color=(0,0,255))
+                #     plt.savefig(f"trajectory_{i}.png")
 
-            #     point = self.point_to_cell(point.reshape(2,1))
-            #     plt.scatter(point[0], point[1], color='b')
-            #     for i in range(1, trajectory_o.shape[1]):
-            #         # print(f"Trajectory point: {trajectory_o[:2,i]}")
-            #         point_image_space = self.point_to_cell(trajectory_o[:2,i].reshape(2,1))
-            #         plt.scatter(point_image_space[0], point_image_space[1], color='r')
-            #         # print(f"Trajectory point in image space: {point_image_space}")
-            #         self.window.add_point(trajectory_o[:2,i], radius=5, color=(255,0,0))
-            #         # self.window.add_point_image_space(point_image_space, radius=5, color=(0,0,255))
-            #     plt.savefig(f"trajectory_{i}.png")
+                # check for duplicates
 
-            # check for duplicates
-
-            if not self.check_if_duplicate(trajectory_o[:,-1]):
-                # print("No duplicate")
-                cost_of_trajectory = self.cost_to_go(trajectory_o)
-                cost_to_come = closest_node.cost + cost_of_trajectory
-                new_node = Node(robot_pose=trajectory_o[:,-1].reshape(3,1), parent_id=closest_node_id, cost=cost_to_come)
-
-
-            # Update graph
-            self.nodes.append(new_node)
+                if not self.check_if_duplicate(trajectory_o[:,-1]):
+                    # print("No duplicate")
+                    cost_of_trajectory = self.cost_to_go(trajectory_o)
+                    cost_to_come = closest_node.cost + cost_of_trajectory
+                    new_node = Node(robot_pose=trajectory_o[:,-1].reshape(3,1), parent_id=closest_node_id, cost=cost_to_come)
+                    closest_node.children_ids.append(len(self.nodes))
+                    if not self.headless:
+                        for i in range(1, trajectory_o.shape[1]):
+                            self.window.add_point(trajectory_o[:2,i], radius=2, color=(0,255,0))
+                    # Update graph
+                    self.nodes.append(new_node)
+                    break
+            
             # time.sleep(0.1)
             #Check if goal has been reached
             if np.linalg.norm(new_node.robot_pose[:2] - self.goal_point) < self.stopping_dist:
                 print("GOAL REACHED!")
-                time.sleep(5)
+                # Return the path
+                while new_node.parent_id > -1:
+                    self.window.add_point(new_node.robot_pose[:2].flatten(), radius=2, color=(255,0,0))
+                    self.window.add_line(self.nodes[new_node.parent_id].robot_pose[:2].flatten(), new_node.robot_pose[:2].flatten(), width=2, color=(255,0,0))
+                    new_node = self.nodes[new_node.parent_id]
+                time.sleep(20)
                 return self.nodes
             
         print("GOAL NOT REACHED!")
@@ -445,6 +484,7 @@ def main():
 
     #robot information
     goal_point = np.array([[42], [-44]]) #m
+    # goal_point = np.array([[10], [-15]]) #m 
     stopping_dist = 1 #m
 
     #RRT precursor
