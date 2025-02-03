@@ -129,16 +129,16 @@ class PathPlanner:
         self.stopping_dist = stopping_dist #m
 
         #Trajectory Simulation Parameters
-        self.timestep = 1 #s
-        self.num_substeps = 5 #Number of substeps in the trajectory
+        self.timestep = 0.5 #s
+        self.num_substeps = 10 #Number of substeps in the trajectory
 
         #Planning storage
         self.nodes = [Node(np.zeros((3,1)), -1, 0)]
 
         # Sampler
-        self.sampler = SlidingWindowSampler((50,70), (10, 10), overlap=0.2, total_samples=int(4000))
-        self.sampler2 = SlidingWindowSampler((50,60), (10, 10), overlap=0.25, total_samples=int(4000), switch=True)
-        self.sampler3 = SlidingWindowSampler((50,60), (2, 2), overlap=0.15, total_samples=int(4000))
+        self.sampler = SlidingWindowSampler((50,70), (10, 10), overlap=0.2, total_samples=int(2000))
+        self.sampler2 = SlidingWindowSampler((50,60), (10, 10), overlap=0.25, total_samples=int(2000), switch=True)
+        self.sampler3 = SlidingWindowSampler((50,60), (2, 2), overlap=0.15, total_samples=int(1000))
 
         #RRT* Specific Parameters
         self.lebesgue_free = np.sum(self.occupancy_map) * self.map_settings_dict["resolution"] **2
@@ -322,8 +322,18 @@ class PathPlanner:
         #node is a 3 by 1 node
         #point is a 2 by 1 point
         print("TO DO: Implement a way to connect two already existing nodes (for rewiring).")
-        return np.zeros((3, self.num_substeps))
-    
+        # diregard theta
+        dist = np.linalg.norm(robot_pose - point_flat)
+        vel = self.vel_max * 0.1
+        final_t = dist / vel
+        for i in range(1,int(final_t/self.timestep)):
+            # Forward Euler
+            last_pos = rollout[:,i-1]
+            q_dot = unicycle_model(vel=vel, rot_vel=0, theta=last_pos[2])
+            rollout[:,i] = last_pos + (q_dot * self.timestep).flatten()
+        return rollout
+
+
     @staticmethod
     def cost_to_go(trajectory_o: np.ndarray) -> float:
         #The cost to get to a node from lavalle 
