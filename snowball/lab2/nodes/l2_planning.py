@@ -13,7 +13,7 @@ import random
 from typing import Tuple
 
 NODE_CLOSENESS_TOL = 0.01
-ITERATIONS = 10000
+ITERATIONS = 13000
 SCALE_FACTOR_VEL = 1
 SCALE_FACTOR_ROT_VEL = 0.5
 
@@ -47,12 +47,14 @@ class Node:
         return
 
 class SlidingWindowSampler:
-    def __init__(self, map_size, window_size, overlap=0.5, total_samples=100):
+    def __init__(self, map_size, window_size, overlap=0.5, total_samples=100, switch=False):
         self.map_size = map_size  # (width, height)
         self.window_size = window_size  # (w, h)
         self.overlap = overlap  # Overlap percentage (0 to 1)
+        self.switch = switch
         self.window_positions = self._generate_window_positions()
         self.num_steps = total_samples // len(self.window_positions)
+        self.total_samples = total_samples
         self.current_step = 0
 
     def _generate_window_positions(self):
@@ -64,12 +66,17 @@ class SlidingWindowSampler:
         step_x = max(1, step_x)
         step_y = max(1, step_y)
 
-        positions = [
-            (x, y)
-            for x in range(0, self.map_size[0] - self.window_size[0] + 1, step_x)
-            for y in range(0, self.map_size[1] - self.window_size[1] + 1, step_y)
-        ]
-        
+        if not self.switch:
+            positions = [
+                (x, y)
+                for x in range(0, self.map_size[0] - self.window_size[0] + 1, step_x)
+                for y in range(0, self.map_size[1] - self.window_size[1] + 1, step_y)
+            ]
+        else:
+            positions = [
+                (x, y)
+                for y in range(0, self.map_size[1] - self.window_size[1] + 1, step_y)
+                for x in range(0, self.map_size[0] - self.window_size[0] + 1, step_x)]
         return positions
 
     def sample(self):
@@ -129,8 +136,9 @@ class PathPlanner:
         self.nodes = [Node(np.zeros((3,1)), -1, 0)]
 
         # Sampler
-        self.sampler = SlidingWindowSampler((55,66), (10, 10), overlap=0.25, total_samples=int(ITERATIONS/2))
-        self.sampler2 = SlidingWindowSampler((55,65), (15, 15), overlap=0.75, total_samples=int(ITERATIONS/2))
+        self.sampler = SlidingWindowSampler((50,65), (10, 10), overlap=0.5, total_samples=int(5000))
+        self.sampler2 = SlidingWindowSampler((50,60), (10, 10), overlap=0.25, total_samples=int(4000), switch=True)
+        self.sampler3 = SlidingWindowSampler((50,60), (2, 2), overlap=0.15, total_samples=int(4000))
 
         #RRT* Specific Parameters
         self.lebesgue_free = np.sum(self.occupancy_map) * self.map_settings_dict["resolution"] **2
@@ -168,10 +176,12 @@ class PathPlanner:
         # random_y = np.clip(random_y, -45, 15)
         print(f"Samples so far: {self.samples_so_far}")
 
-        if self.samples_so_far < ITERATIONS/2:
+        if self.samples_so_far < self.sampler.total_samples:
             return self.sampler.sample() + np.array([[-5], [15]])
-        else:
+        elif self.samples_so_far < self.sampler2.total_samples + self.sampler.total_samples:
             return self.sampler2.sample() + np.array([[-5], [15]])
+        else:
+            return self.sampler3.sample() + np.array([[-5], [15]])
 
 
     def check_if_duplicate(self, pose: np.ndarray) -> bool:
@@ -315,8 +325,8 @@ class PathPlanner:
             #Sample map space
             point = self.sample_map_space()
             self.samples_so_far += 1
-            if not self.headless:
-                self.window.add_point(point[:2].flatten(), radius = 2, color=(0,0,255))
+            # if not self.headless:
+            #     self.window.add_point(point[:2].flatten(), radius = 2, color=(0,0,255))
             
             #Get the closest point
             closest_node_id = self.closest_node(point)
@@ -334,9 +344,9 @@ class PathPlanner:
                     #         # set the trajectory to the point before the collision
                     #         trajectory_o[:,i:] = trajectory_o[:,i-1].reshape(3,1)
                     #         break
-                    continue
-                    # for i inrange(1, trajectory_o.shape[1]):
+                    # for i in range(1, trajectory_o.shape[1]):
                     #     self.window.add_point(trajectory_o[:2,i], radius=2, color=(255,0,0))
+                    continue
             # plot trajectory
 
             if not self.headless:
@@ -435,7 +445,7 @@ def main():
 
     #robot information
     goal_point = np.array([[42], [-44]]) #m
-    stopping_dist = 0.5 #m
+    stopping_dist = 1 #m
 
     #RRT precursor
     path_planner = PathPlanner(map_filename, map_setings_filename, goal_point, stopping_dist, headless=False)
