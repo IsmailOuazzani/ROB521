@@ -326,6 +326,8 @@ class PathPlanner:
         dist = np.linalg.norm(robot_pose - point_flat)
         vel = self.vel_max * 0.1
         final_t = dist / vel
+        rollout = np.zeros((3, int(final_t/self.timestep)))
+        rollout[:,0] = node_i.robot_pose.flatten()
         for i in range(1,int(final_t/self.timestep)):
             # Forward Euler
             last_pos = rollout[:,i-1]
