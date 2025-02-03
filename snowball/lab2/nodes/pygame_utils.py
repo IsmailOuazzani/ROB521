@@ -27,7 +27,7 @@ class PygameWindow:
         self.map_settings_dict = map_settings_dict
         self.origin = np.array(map_settings_dict['origin'])
 
-        map_img = pygame.image.load('../maps/willowgarageworld_05res.png')
+        map_img = pygame.image.load('../maps/' + name)
         map_img = pygame.transform.scale(map_img, self.size)
 
         self.screen = pygame.display.set_mode(self.size)
@@ -42,6 +42,7 @@ class PygameWindow:
         self.add_point(goal_point.flatten(), radius=stopping_dist / self.meters_per_pixel, color=COLORS['g'])
 
     def add_point(self, map_frame_point, radius=1, width=0, color=COLORS['k']):
+        map_frame_point = map_frame_point.copy()
         map_frame_point[1] = -map_frame_point[1]  # for top left origin
         point_vec = self.point_to_vec(np.array(map_frame_point) / self.meters_per_pixel + self.origin_pixels)
         pygame.draw.circle(self.screen, color, point_vec, radius, width)
