@@ -238,7 +238,7 @@ class PathPlanner:
                 nodes_within_radius.append(i)
         return nodes_within_radius
 
-    def k_closest_nodes(self, point: np.ndarray, k: int) -> np.ndarray:
+    def k_closest_nodes(self, point: np.ndarray, k: int) -> list[int]:
         #Returns the indices of the k closest nodes
         closest_nodes = []
         for i, node in enumerate(self.nodes):
@@ -249,6 +249,24 @@ class PathPlanner:
             closest_nodes.append((i, cost))
         closest_nodes.sort(key=lambda x: x[1])
         return [node[0] for node in closest_nodes[:k]]
+    
+    def k_closest_and_within_radius(self, point: np.ndarray, k: int, radius: float) -> Tuple[list[int], list[int]]:
+      closest_nodes = []
+      nodes_within_radius = []
+      for i, node in enumerate(self.nodes):
+          dist = np.linalg.norm(node.robot_pose[:2] - point)
+          # Ball radius
+          if dist < radius:
+              nodes_within_radius.append(i)
+          # Keep track of the k smallest distances
+          if len(closest_nodes) < k:
+              closest_nodes.append((i, dist))
+          else:
+              max_index = max(range(len(closest_nodes)), key=lambda x: closest_nodes[x][1])
+              if dist < closest_nodes[max_index][1]:
+                  closest_nodes[max_index] = (i, dist)
+      return [node[0] for node in closest_nodes], nodes_within_radius
+        
     
     def simulate_trajectory(self, node_i: Node, point_s: np.ndarray) -> np.ndarray:
         #Simulates the non-holonomic motion of the robot.
@@ -407,8 +425,8 @@ class PathPlanner:
             #Sample
             point = self.sample_map_space()
             self.samples_so_far += 1
-            # if not self.headless:
-            #     self.window.add_point(point[:2].flatten(), radius = 2, color=(0,0,255))
+            if not self.headless:
+                self.window.add_point(point[:2].flatten(), radius = 2, color=(0,0,255))
 
             #Closest Node
             #TODO: combine closest node and nodes_within_radius and k_closest_nodes within the same O(n) loop
