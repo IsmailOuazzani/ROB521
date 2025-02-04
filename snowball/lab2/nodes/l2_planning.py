@@ -137,7 +137,7 @@ class PathPlanner:
         self.nodes = [Node(np.zeros((3,1)), -1, 0, 0)]
 
         # Sampler
-        self.sampler = SlidingWindowSampler((50,70), (10, 10), overlap=0.2, total_samples=int(2000))
+        self.sampler = SlidingWindowSampler((50,60), (10, 10), overlap=0.2, total_samples=int(2000))
         self.sampler2 = SlidingWindowSampler((50,60), (10, 10), overlap=0.25, total_samples=int(2000), switch=True)
         self.sampler3 = SlidingWindowSampler((50,60), (2, 2), overlap=0.1, total_samples=int(2000))
 
@@ -159,18 +159,25 @@ class PathPlanner:
     #Functions required for RRT
     def sample_map_space(self) -> np.ndarray:
         # print(f"Samples so far: {self.samples_so_far}")
-
-        if self.samples_so_far < self.sampler.total_samples:
-            return self.sampler.sample() + np.array([[-5], [15]])
-        elif self.samples_so_far < self.sampler.total_samples + 500:
-            # sample in the goal region
-            random_x = np.random.uniform(self.goal_point[0] - 2.5,self. goal_point[0] + 2.5)
-            random_y = np.random.uniform(self.goal_point[1] - 2.5, self.goal_point[1] + 2.5)
-            return np.array([[random_x], [random_y]])
-        elif self.samples_so_far < self.sampler2.total_samples + self.sampler.total_samples + 500:
-            return self.sampler2.sample() + np.array([[-5], [15]])
+        if self.samples_so_far < 2000:
+            random_x = float(np.random.uniform(-5,50))
+            random_y = float(np.random.uniform(-50,20))
         else:
-            return self.sampler3.sample() + np.array([[-5], [15]])
+            random_x = float(np.random.uniform(self.goal_point[0] - 2.5,self. goal_point[0] + 2.5))
+            random_y = float(np.random.uniform(self.goal_point[1] - 2.5, self.goal_point[1] + 2.5))
+        return np.array([[random_x], [random_y]])
+        # return np.array([[x], [y]])
+        # if self.samples_so_far < self.sampler.total_samples:
+        #     return self.sampler.sample() + np.array([[-5], [15]])
+        # elif self.samples_so_far < self.sampler.total_samples + 500:
+        #     # sample in the goal region
+        #     random_x = float(np.random.uniform(self.goal_point[0] - 2.5,self. goal_point[0] + 2.5))
+        #     random_y = float(np.random.uniform(self.goal_point[1] - 2.5, self.goal_point[1] + 2.5))
+        #     return np.array([[random_x], [random_y]])
+        # elif self.samples_so_far < self.sampler2.total_samples + self.sampler.total_samples + 500:
+        #     return self.sampler2.sample() + np.array([[-5], [15]])
+        # else:
+        #     return self.sampler3.sample() + np.array([[-5], [15]])
 
 
     def check_if_duplicate(self, pose: np.ndarray) -> bool:
@@ -345,6 +352,7 @@ class PathPlanner:
     def rrt_planning(self):
         #This function performs RRT on the given map and robot
         #You do not need to demonstrate this function to the TAs, but it is left in for you to check your work
+        new_node = self.nodes[0]    
         for i in range(ITERATIONS): #Most likely need more iterations than this to complete the map!
             #Sample map space
             point = self.sample_map_space()
@@ -393,6 +401,7 @@ class PathPlanner:
         return self.nodes
     
     def rrt_star_planning(self):
+        new_node= self.nodes[0]
         #This function performs RRT* for the given map and robot        
         for i in range(ITERATIONS): #Most likely need more iterations than this to complete the map!
             #Sample
@@ -532,6 +541,7 @@ def main():
     nodes = path_planner.rrt_star_planning()
     # nodes = path_planner.rrt_planning()
     print("Path Length: ", len(nodes))
+    print("Samples so far: ", path_planner.samples_so_far)
     print(nodes[0].robot_pose)
     print(nodes[-1].robot_pose)
     path = path_planner.recover_path()
