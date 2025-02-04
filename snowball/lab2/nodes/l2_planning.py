@@ -180,8 +180,8 @@ class PathPlanner:
             return self.sampler.sample() + np.array([[-5], [15]])
         elif self.samples_so_far < self.sampler.total_samples + 500:
             # sample in the goal region
-            random_x = np.random.uniform(self.goal_point[0] - 7.5,  self.goal_point[0] + 2.5)
-            random_y = np.random.uniform(self.goal_point[1] - 3, self.goal_point[1] + 3)
+            random_x = float(np.random.uniform(self.goal_point[0] - 7.5,  self.goal_point[0] + 2.5))
+            random_y = float(np.random.uniform(self.goal_point[1] - 3, self.goal_point[1] + 3))
             return np.array([[random_x], [random_y]]) 
         elif self.samples_so_far < self.sampler2.total_samples + self.sampler.total_samples + 500:
             return self.sampler2.sample() + np.array([[-5], [15]])
@@ -190,8 +190,8 @@ class PathPlanner:
         # if self.samples_so_far < 200:
         #     return self.sampler.sample() + np.array([[-5], [15]])
         # else:
-        #     random_x = np.random.uniform(self.goal_point[0] - 7.5,  self.goal_point[0] + 2.5)
-        #     random_y = np.random.uniform(self.goal_point[1] - 2.5, self.goal_point[1] + 2.5)
+        #     random_x = float(np.random.uniform(self.goal_point[0] - 7.5,  self.goal_point[0] + 2.5))
+        #     random_y = float(np.random.uniform(self.goal_point[1] - 2.5, self.goal_point[1] + 2.5)) 
         #     return np.array([[random_x], [random_y]]) 
 
 
@@ -373,6 +373,7 @@ class PathPlanner:
             #Sample map space
             point = self.sample_map_space()
             self.samples_so_far += 1
+            print(f"sample type: {point}")
             if not self.headless:
                 self.window.add_point(point[:2].flatten(), radius = 2, color=(0,0,255))
             
@@ -402,8 +403,8 @@ class PathPlanner:
                     #     #         break
                     # trajectory_o = trajectory_o[:,2:] = trajectory_o[:,1].reshape(3,1)
 
-                    for i in range(1, trajectory_o.shape[1]):
-                        self.window.add_point(trajectory_o[:2,i], radius=2, color=(255,0,0))
+                    # for i in range(1, trajectory_o.shape[1]):
+                    #     self.window.add_point(trajectory_o[:2,i], radius=2, color=(255,0,0))
                     continue
                         
                 
@@ -448,7 +449,7 @@ class PathPlanner:
                     self.window.add_point(new_node.robot_pose[:2].flatten(), radius=2, color=(255,0,0))
                     self.window.add_line(self.nodes[new_node.parent_id].robot_pose[:2].flatten(), new_node.robot_pose[:2].flatten(), width=2, color=(255,0,0))
                     new_node = self.nodes[new_node.parent_id]
-                # time.sleep(20)
+                time.sleep(20)
                 return self.nodes
             
         print("GOAL NOT REACHED!")
@@ -509,7 +510,7 @@ def main():
 
     #robot information
     goal_point = np.array([[42], [-44]]) #m
-    goal_point = np.  array([[10], [-15]]) #m 
+    # goal_point = np.  array([[10], [-15]]) #m 
     # goal_point = np.array([[5], [0]]) #m
     stopping_dist = 1 #m
 
