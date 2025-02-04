@@ -97,3 +97,10 @@ def test_update_children():
     assert nodes[2].cost == 4
     assert nodes[3].cost == 6
 
+def test_cost_of_trajectory():
+    trajectory = np.array([
+        [0, 1, 2, 3, 4],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0]
+    ])
+    assert PLANNER.cost_of_trajectory(trajectory) == 4
