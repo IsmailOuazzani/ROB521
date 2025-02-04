@@ -140,6 +140,7 @@ class PathPlanner:
         self.sampler2 = SlidingWindowSampler((50,60), (10, 10), overlap=0.25, total_samples=int(2000), switch=True)
         self.sampler3 = SlidingWindowSampler((50,60), (2, 2), overlap=0.15, total_samples=int(2000))
 
+
         #RRT* Specific Parameters
         self.lebesgue_free = np.sum(self.occupancy_map) * self.map_settings_dict["resolution"] **2
         self.zeta_d = np.pi
@@ -152,7 +153,7 @@ class PathPlanner:
         if not self.headless:
             #Pygame window for visualization
             self.window = pygame_utils.PygameWindow(
-                map_filename, (1000, 1000), self.occupancy_map.shape, self.map_settings_dict, self.goal_point, self.stopping_dist)
+                map_filename, (500, 500), self.occupancy_map.shape, self.map_settings_dict, self.goal_point, self.stopping_dist)
         return
 
     #Functions required for RRT
@@ -172,21 +173,33 @@ class PathPlanner:
         # make sure the point is within the bounds
         # random_x = np.clip(random_x, self.bounds[0,0], self.bounds[0,1])
         # random_y = np.clip(random_y, self.bounds[1,0], self.bounds[1,1])
-        # random_x = np.clip(random_x, -10, 40)
-        # random_y = np.clip(random_y, -45, 15)
-        # print(f"Samples so far: {self.samples_so_far}")
+        random_x = float(np.random.uniform(self.bounds[0,0], self.bounds[0,1]))
+        random_y = float(np.random.uniform(self.bounds[1,0], self.bounds[1,1]))
+        return np.array([[random_x], [random_y]])
 
-        if self.samples_so_far < self.sampler.total_samples:
-            return self.sampler.sample() + np.array([[-5], [15]])
-        elif self.samples_so_far < self.sampler.total_samples + 500:
-            # sample in the goal region
-            random_x = float(np.random.uniform(self.goal_point[0] - 7.5,  self.goal_point[0] + 2.5))
-            random_y = float(np.random.uniform(self.goal_point[1] - 3, self.goal_point[1] + 3))
-            return np.array([[random_x], [random_y]]) 
-        elif self.samples_so_far < self.sampler2.total_samples + self.sampler.total_samples + 500:
-            return self.sampler2.sample() + np.array([[-5], [15]])
-        else:
-            return self.sampler3.sample() + np.array([[-5], [15]])
+        # if self.samples_so_far < self.sampler.total_samples:
+        #     return self.sampler.sample() + np.array([[-5], [15]])
+        # elif self.samples_so_far < self.sampler.total_samples + 500:
+        #     # sample in the goal region
+        #     random_x = float(np.random.uniform(self.goal_point[0] - 7.5,  self.goal_point[0] + 2.5))
+        #     random_y = float(np.random.uniform(self.goal_point[1] - 3, self.goal_point[1] + 3))
+        #     return np.array([[random_x], [random_y]]) 
+        # elif self.samples_so_far < self.sampler2.total_samples + self.sampler.total_samples + 500:
+        #     return self.sampler2.sample() + np.array([[-5], [15]])
+        # else:
+        #     return self.sampler3.sample() + np.array([[-5], [15]])
+
+        # if self.samples_so_far < self.sampler.total_samples:
+        #     return self.sampler.sample() + np.array([[-5], [15]])
+        # elif self.samples_so_far < self.sampler.total_samples + 500:
+        #     # sample in the goal region
+        #     random_x = float(np.random.uniform(self.goal_point[0] - 7.5,  self.goal_point[0] + 2.5))
+        #     random_y = float(np.random.uniform(self.goal_point[1] - 3, self.goal_point[1] + 3))
+        #     return np.array([[random_x], [random_y]]) 
+        # elif self.samples_so_far < self.sampler2.total_samples + self.sampler.total_samples + 500:
+        #     return self.sampler2.sample() + np.array([[-5], [15]])
+        # else:
+        #     return self.sampler3.sample() + np.array([[-5], [15]])
         # if self.samples_so_far < 200:
         #     return self.sampler.sample() + np.array([[-5], [15]])
         # else:
@@ -235,7 +248,7 @@ class PathPlanner:
             dist = np.linalg.norm(node.robot_pose[:2] - point)
             angle_to_target = np.arctan2(point[1] - node.robot_pose[1], point[0] - node.robot_pose[0])
             angle_diff = np.arctan2(np.sin(angle_to_target - node.robot_pose[2]), np.cos(angle_to_target - node.robot_pose[2]))
-            cost = dist + 1.5*abs(angle_diff)
+            cost = dist #+ 1.5*abs(angle_diff)
             closest_nodes.append((i, cost))
         closest_nodes.sort(key=lambda x: x[1])
         return [node[0] for node in closest_nodes[:k]]
@@ -280,19 +293,19 @@ class PathPlanner:
         rollout = np.zeros((3, self.num_substeps))
         rollout[:,0] = node_i.robot_pose.flatten()
         
-        # for i in range(1,self.num_substeps):
-        #     # Forward Euler
-        #     last_pos = rollout[:,i-1]
-        #     q_dot = unicycle_model(vel=vel, rot_vel=rot_vel, theta=last_pos[2])
-        #     rollout[:,i] = last_pos + (q_dot * self.timestep).flatten()
-
-        # first perform the rotation in first step
-        rollout[:,1] = rollout[:,0] + np.array([0, 0, rot_vel * self.timestep * self.num_substeps])
-        for i in range(2,self.num_substeps):
+        for i in range(1,self.num_substeps):
             # Forward Euler
             last_pos = rollout[:,i-1]
-            q_dot = unicycle_model(vel=vel, rot_vel=0, theta=last_pos[2])
+            q_dot = unicycle_model(vel=vel, rot_vel=rot_vel, theta=last_pos[2])
             rollout[:,i] = last_pos + (q_dot * self.timestep).flatten()
+
+        # first perform the rotation in first step
+        # rollout[:,1] = rollout[:,0] + np.array([0, 0, rot_vel * self.timestep * self.num_substeps])
+        # for i in range(2,self.num_substeps):
+        #     # Forward Euler
+        #     last_pos = rollout[:,i-1]
+        #     q_dot = unicycle_model(vel=vel, rot_vel=0, theta=last_pos[2])
+        #     rollout[:,i] = last_pos + (q_dot * self.timestep).flatten()
     
 
         return rollout
@@ -449,7 +462,7 @@ class PathPlanner:
                     self.window.add_point(new_node.robot_pose[:2].flatten(), radius=2, color=(255,0,0))
                     self.window.add_line(self.nodes[new_node.parent_id].robot_pose[:2].flatten(), new_node.robot_pose[:2].flatten(), width=2, color=(255,0,0))
                     new_node = self.nodes[new_node.parent_id]
-                time.sleep(20)
+                # time.sleep(20)
                 return self.nodes
             
         print("GOAL NOT REACHED!")
@@ -504,14 +517,15 @@ def main():
     #Set map information
     map_filename = "myhal.png"
     map_setings_filename = "myhal.yaml"
-    map_filename = "willowgarageworld_05res.png"
-    map_setings_filename = "willowgarageworld_05res.yaml"
+    # map_filename = "willowgarageworld_05res.png"
+    # map_setings_filename = "willowgarageworld_05res.yaml"
 
 
     #robot information
-    goal_point = np.array([[42], [-44]]) #m
+    # goal_point = np.array([[42], [-44]]) #m
     # goal_point = np.  array([[10], [-15]]) #m 
     # goal_point = np.array([[5], [0]]) #m
+    goal_point = np.array([[7], [0]]) #m
     stopping_dist = 1 #m
 
     #RRT precursor
