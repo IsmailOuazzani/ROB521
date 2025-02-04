@@ -10,7 +10,8 @@ RUN apt-get install -y git tmux ros-noetic-joy ros-noetic-teleop-twist-joy \
     ros-noetic-compressed-image-transport ros-noetic-rqt* \
     ros-noetic-rviz ros-noetic-gmapping \
     ros-noetic-navigation ros-noetic-interactive-markers \
-    python3-pip
+    python3-pip \
+    python3-tk
 
 RUN apt-get install -y ros-noetic-dynamixel-sdk \
                 ros-noetic-turtlebot3-msgs \

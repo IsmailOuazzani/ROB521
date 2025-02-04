@@ -136,9 +136,9 @@ class PathPlanner:
         self.nodes = [Node(np.zeros((3,1)), -1, 0)]
 
         # Sampler
-        self.sampler = SlidingWindowSampler((50,70), (10, 10), overlap=0.2, total_samples=int(2000))
+        self.sampler = SlidingWindowSampler((50,60), (10, 10), overlap=0.2, total_samples=int(2000))
         self.sampler2 = SlidingWindowSampler((50,60), (10, 10), overlap=0.25, total_samples=int(2000), switch=True)
-        self.sampler3 = SlidingWindowSampler((50,60), (2, 2), overlap=0.15, total_samples=int(1000))
+        self.sampler3 = SlidingWindowSampler((50,60), (2, 2), overlap=0.15, total_samples=int(2000))
 
         #RRT* Specific Parameters
         self.lebesgue_free = np.sum(self.occupancy_map) * self.map_settings_dict["resolution"] **2
@@ -174,19 +174,25 @@ class PathPlanner:
         # random_y = np.clip(random_y, self.bounds[1,0], self.bounds[1,1])
         # random_x = np.clip(random_x, -10, 40)
         # random_y = np.clip(random_y, -45, 15)
-        print(f"Samples so far: {self.samples_so_far}")
+        # print(f"Samples so far: {self.samples_so_far}")
 
         if self.samples_so_far < self.sampler.total_samples:
             return self.sampler.sample() + np.array([[-5], [15]])
         elif self.samples_so_far < self.sampler.total_samples + 500:
             # sample in the goal region
-            random_x = np.random.uniform(self.goal_point[0] - 10,self. goal_point[0] + 10)
-            random_y = np.random.uniform(self.goal_point[1] - 10, self.goal_point[1] + 10)
-            return np.array([[random_x], [random_y]])
+            random_x = np.random.uniform(self.goal_point[0] - 7.5,  self.goal_point[0] + 2.5)
+            random_y = np.random.uniform(self.goal_point[1] - 3, self.goal_point[1] + 3)
+            return np.array([[random_x], [random_y]]) 
         elif self.samples_so_far < self.sampler2.total_samples + self.sampler.total_samples + 500:
             return self.sampler2.sample() + np.array([[-5], [15]])
         else:
             return self.sampler3.sample() + np.array([[-5], [15]])
+        # if self.samples_so_far < 200:
+        #     return self.sampler.sample() + np.array([[-5], [15]])
+        # else:
+        #     random_x = np.random.uniform(self.goal_point[0] - 7.5,  self.goal_point[0] + 2.5)
+        #     random_y = np.random.uniform(self.goal_point[1] - 2.5, self.goal_point[1] + 2.5)
+        #     return np.array([[random_x], [random_y]]) 
 
 
     def check_if_duplicate(self, pose: np.ndarray) -> bool:
@@ -362,17 +368,23 @@ class PathPlanner:
     def rrt_planning(self):
         #This function performs RRT on the given map and robot
         #You do not need to demonstrate this function to the TAs, but it is left in for you to check your work
+        new_node = self.nodes[0]
         for i in range(ITERATIONS): #Most likely need more iterations than this to complete the map!
             #Sample map space
             point = self.sample_map_space()
             self.samples_so_far += 1
-            # if not self.headless:
-            #     self.window.add_point(point[:2].flatten(), radius = 2, color=(0,0,255))
+            if not self.headless:
+                self.window.add_point(point[:2].flatten(), radius = 2, color=(0,0,255))
             
             #Get the closest point
             # closest_node_id = self.closest_node(point)
             # closest_node = self.nodes[closest_node_id]
-            closest_node_ids = self.k_closest_nodes(point, 5)
+            if self.samples_so_far < self.sampler.total_samples or self.samples_so_far > self.sampler.total_samples + 500:
+                k = 5
+            else:
+                k = 10
+            closest_node_ids = self.k_closest_nodes(point, k)
+            print(f"len(closest_node_ids): {len(closest_node_ids)}")
             for closest_node_id in closest_node_ids:
                 closest_node = self.nodes[closest_node_id]
 
@@ -380,7 +392,6 @@ class PathPlanner:
                 trajectory_o = self.simulate_trajectory(closest_node, point)
                 # Test for collision
                 if self.collision_detected(trajectory_o):
-                    continue
                     # if not self.headless:
                     #     # print("Collision Detected!")
                     #     # # find first collision point
@@ -389,9 +400,11 @@ class PathPlanner:
                     #     #         # set the trajectory to the point before the collision
                     #     #         trajectory_o[:,i:] = trajectory_o[:,i-1].reshape(3,1)
                     #     #         break
-                    #     # trajectory_o = trajectory_o[:,2:] = trajectory_o[:,1].reshape(3,1)
-                    #     # for i in range(1, trajectory_o.shape[1]):
-                    #     #     self.window.add_point(trajectory_o[:2,i], radius=2, color=(255,0,0))
+                    # trajectory_o = trajectory_o[:,2:] = trajectory_o[:,1].reshape(3,1)
+
+                    for i in range(1, trajectory_o.shape[1]):
+                        self.window.add_point(trajectory_o[:2,i], radius=2, color=(255,0,0))
+                    continue
                         
                 
                 # # ADD TRANSLATION FROM LAST THING
@@ -435,7 +448,7 @@ class PathPlanner:
                     self.window.add_point(new_node.robot_pose[:2].flatten(), radius=2, color=(255,0,0))
                     self.window.add_line(self.nodes[new_node.parent_id].robot_pose[:2].flatten(), new_node.robot_pose[:2].flatten(), width=2, color=(255,0,0))
                     new_node = self.nodes[new_node.parent_id]
-                time.sleep(20)
+                # time.sleep(20)
                 return self.nodes
             
         print("GOAL NOT REACHED!")
@@ -496,7 +509,8 @@ def main():
 
     #robot information
     goal_point = np.array([[42], [-44]]) #m
-    # goal_point = np.array([[10], [-15]]) #m 
+    goal_point = np.  array([[10], [-15]]) #m 
+    # goal_point = np.array([[5], [0]]) #m
     stopping_dist = 1 #m
 
     #RRT precursor
@@ -507,10 +521,10 @@ def main():
     print(nodes[-1].robot_pose)
     path = path_planner.recover_path()
     print(len(path))
-    # node_path_metric = np.hstack(path_planner.recover_path())
+    node_path_metric = np.hstack(path_planner.recover_path())
 
     #Leftover test functions
-    # np.save("shortest_path.npy", node_path_metric)
+    np.save("shortest_path.npy", node_path_metric)
 
 
 if __name__ == '__main__':
