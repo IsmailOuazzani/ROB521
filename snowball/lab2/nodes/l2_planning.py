@@ -46,12 +46,16 @@ class Node:
         self.children_ids = children_ids # The children node ids of this node
         self.cost_from_parent = cost_from_parent
         return
+
 def update_children(nodes: list[Node], node_id: int):
         #Given a node_id with a changed cost, update all connected nodes with the new cost
         root = nodes[node_id]
         queue = [root]
         while queue:
             node = queue.pop(0)
+            print(f"node id: {node_id}")
+            print(f"node children: {node.children_ids}")
+            print(f"queue: {queue}")
             for child_id in node.children_ids:
                 child: Node = nodes[child_id]
                 child.cost = node.cost + child.cost_from_parent
@@ -305,19 +309,19 @@ class PathPlanner:
         rollout = np.zeros((3, self.num_substeps))
         rollout[:,0] = node_i.robot_pose.flatten()
         
-        for i in range(1,self.num_substeps):
-            # Forward Euler
-            last_pos = rollout[:,i-1]
-            q_dot = unicycle_model(vel=vel, rot_vel=rot_vel, theta=last_pos[2])            
-            rollout[:,i] = last_pos + (q_dot * self.timestep).flatten()
-
-        # first perform the rotation in first step
-        # rollout[:,1] = rollout[:,0] + np.array([0, 0, rot_vel * self.timestep * self.num_substeps])
-        # for i in range(2,self.num_substeps):
+        # for i in range(1,self.num_substeps):
         #     # Forward Euler
         #     last_pos = rollout[:,i-1]
-        #     q_dot = unicycle_model(vel=vel, rot_vel=0, theta=last_pos[2])
+        #     q_dot = unicycle_model(vel=vel, rot_vel=rot_vel, theta=last_pos[2])            
         #     rollout[:,i] = last_pos + (q_dot * self.timestep).flatten()
+
+        # first perform the rotation in first step
+        rollout[:,1] = rollout[:,0] + np.array([0, 0, rot_vel * self.timestep * self.num_substeps])
+        for i in range(2,self.num_substeps):
+            # Forward Euler
+            last_pos = rollout[:,i-1]
+            q_dot = unicycle_model(vel=vel, rot_vel=0, theta=last_pos[2])
+            rollout[:,i] = last_pos + (q_dot * self.timestep).flatten()
     
 
         return rollout
@@ -410,7 +414,6 @@ class PathPlanner:
             else:
                 k = 10
             closest_node_ids = self.k_closest_nodes(point, k)
-            print(f"len(closest_node_ids): {len(closest_node_ids)}")
             for closest_node_id in closest_node_ids:
                 closest_node = self.nodes[closest_node_id]
 
@@ -446,9 +449,9 @@ class PathPlanner:
                     self.window.add_point(new_node.robot_pose[:2].flatten(), radius=2, color=(255,0,0))
                     self.window.add_line(self.nodes[new_node.parent_id].robot_pose[:2].flatten(), new_node.robot_pose[:2].flatten(), width=2, color=(255,0,0))
                     new_node = self.nodes[new_node.parent_id]
-                    pizel_coords = self.point_to_cell(new_node.robot_pose[:2])
+                    # pizel_coords = self.point_to_cell(new_node.robot_pose[:2])
                     # plt.plot([new_node.robot_pose[0], self.goal_point[0]], [new_node.robot_pose[1], self.goal_point[1]], 'r-')
-                    plt.plot(pizel_coords[0], pizel_coords[1], 'gx')
+                    # plt.plot(pizel_coords[0], pizel_coords[1], 'gx')
                     # plot trajectory
                     
                 # time.sleep(20)
@@ -500,6 +503,7 @@ class PathPlanner:
                 #         self.window.add_point(trajectory_o[:2,i], radius=2, color=(0,255,0))
                 # print(f"Inital parent: {new_node.parent_id}")
                 for node_id in closest_nodes_ids:
+                    print("rewiring")
                     if node_id == closest_node_id:
                         continue
                     node = self.nodes[node_id]
@@ -523,6 +527,7 @@ class PathPlanner:
 
                 #Close node rewire
                 for node_id in closest_nodes_ids:
+                    print("rewiring edge")
                     node = self.nodes[node_id]
                     trajectory_o = self.connect_node_to_point(new_node, node.robot_pose[:2])
                     trajectory_o[2,trajectory_o.shape[1]-1] = node.robot_pose[2]
@@ -537,7 +542,9 @@ class PathPlanner:
                         node.cost_from_parent = cost_from_parent
                         node.cost = cost
                         new_node.children_ids.append(node_id)
+                        print(f"rewired edge from {new_node_id} to {node_id}")
                         update_children(nodes=self.nodes, node_id=node_id) 
+                        print(f"done")
                         # plot trajectory
                         # if not self.headless:
                         #     for i in range(1, trajectory_o.shape[1]):
