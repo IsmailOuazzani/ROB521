@@ -141,8 +141,8 @@ class PathPlanner:
         self.stopping_dist = stopping_dist #m
 
         #Trajectory Simulation Parameters
-        self.timestep = 0.6 #s
-        self.num_substeps = 5 #Number of substeps in the trajectory
+        self.timestep = 0.5 #s
+        self.num_substeps = 10 #Number of substeps in the trajectory
 
         #Planning storage
         self.nodes = [Node(np.zeros((3,1)), -1, 0, 0)]
@@ -171,21 +171,21 @@ class PathPlanner:
     #Functions required for RRT
     def sample_map_space(self) -> np.ndarray:
         #Return an [x,y] coordinate to drive the robot towards 
-        random_x = float(np.random.uniform(self.bounds[0,0], self.bounds[0,1]))
-        random_y = float(np.random.uniform(self.bounds[1,0], self.bounds[1,1]))
-        return np.array([[random_x], [random_y]])
+        # random_x = float(np.random.uniform(self.bounds[0,0], self.bounds[0,1]))
+        # random_y = float(np.random.uniform(self.bounds[1,0], self.bounds[1,1]))
+        # return np.array([[random_x], [random_y]])
 
-        # if self.samples_so_far < self.sampler.total_samples:
-        #     return self.sampler.sample() + np.array([[-5], [15]])
-        # elif self.samples_so_far < self.sampler.total_samples + 500:
-        #     # sample in the goal region
-        #     random_x = float(np.random.uniform(self.goal_point[0] - 7.5,  self.goal_point[0] + 2.5))
-        #     random_y = float(np.random.uniform(self.goal_point[1] - 3, self.goal_point[1] + 3))
-        #     return np.array([[random_x], [random_y]]) 
-        # elif self.samples_so_far < self.sampler2.total_samples + self.sampler.total_samples + 500:
-        #     return self.sampler2.sample() + np.array([[-5], [15]])
-        # else:
-        #     return self.sampler3.sample() + np.array([[-5], [15]])
+        if self.samples_so_far < self.sampler.total_samples:
+            return self.sampler.sample() + np.array([[-5], [15]])
+        elif self.samples_so_far < self.sampler.total_samples + 500:
+            # sample in the goal region
+            random_x = float(np.random.uniform(self.goal_point[0] - 7.5,  self.goal_point[0] + 2.5))
+            random_y = float(np.random.uniform(self.goal_point[1] - 3, self.goal_point[1] + 3))
+            return np.array([[random_x], [random_y]]) 
+        elif self.samples_so_far < self.sampler2.total_samples + self.sampler.total_samples + 500:
+            return self.sampler2.sample() + np.array([[-5], [15]])
+        else:
+            return self.sampler3.sample() + np.array([[-5], [15]])
 
         # if self.samples_so_far < 2000:
         #     random_x = float(np.random.uniform(-5,50))
@@ -241,22 +241,22 @@ class PathPlanner:
         closest_nodes.sort(key=lambda x: x[1])
         return [node[0] for node in closest_nodes[:k]]
 
-    def k_closest_and_within_radius(self, point: np.ndarray, k: int, radius: float) -> Tuple[list[int], list[int]]:
-        closest_nodes = []
-        nodes_within_radius = []
-        for i, node in enumerate(self.nodes):
-            dist = np.linalg.norm(node.robot_pose[:2] - point)
-            # Ball radius
-            if dist < radius:
-                nodes_within_radius.append(i)
-            # Keep track of the k smallest distances
-            if len(closest_nodes) < k:
-                closest_nodes.append((i, dist))
-            else:
-                max_index = max(range(len(closest_nodes)), key=lambda x: closest_nodes[x][1])
-                if dist < closest_nodes[max_index][1]:
-                    closest_nodes[max_index] = (i, dist)
-        return [node[0] for node in closest_nodes], nodes_within_radius
+    # def k_closest_and_within_radius(self, point: np.ndarray, k: int, radius: float) -> Tuple[list[int], list[int]]:
+    #     closest_nodes = []
+    #     nodes_within_radius = []
+    #     for i, node in enumerate(self.nodes):
+    #         dist = np.linalg.norm(node.robot_pose[:2] - point)
+    #         # Ball radius
+    #         if dist < radius:
+    #             nodes_within_radius.append(i)
+    #         # Keep track of the k smallest distances
+    #         if len(closest_nodes) < k:
+    #             closest_nodes.append((i, dist))
+    #         else:
+    #             max_index = max(range(len(closest_nodes)), key=lambda x: closest_nodes[x][1])
+    #             if dist < closest_nodes[max_index][1]:
+    #                 closest_nodes[max_index] = (i, dist)
+    #     return [node[0] for node in closest_nodes], nodes_within_radius
     
     def simulate_trajectory(self, node_i: Node, point_s: np.ndarray) -> np.ndarray:
         #Simulates the non-holonomic motion of the robot.
@@ -292,12 +292,12 @@ class PathPlanner:
 
         return vel, rot_vel
     
-    def is_trajectory_in_bounds(self, trajectory: np.ndarray) -> bool:
-        #Check if the trajectory is within the bounds of the map
-        for point in trajectory[:2]:
-            if point[0] < self.bounds[0,0] or point[0] > self.bounds[0,1] or point[1] < self.bounds[1,0] or point[1] > self.bounds[1,1]:
-                return False
-        return True
+    # def is_trajectory_in_bounds(self, trajectory: np.ndarray) -> bool:
+    #     #Check if the trajectory is within the bounds of the map
+    #     for point in trajectory[:2]:
+    #         if point[0] < self.bounds[0,0] or point[0] > self.bounds[0,1] or point[1] < self.bounds[1,0] or point[1] > self.bounds[1,1]:
+    #             return False
+    #     return True
             
     def trajectory_rollout(self,  node_i: Node, vel: float, rot_vel: float):
         # Given your chosen velocities determine the trajectory of the robot for your given timestep
@@ -391,7 +391,7 @@ class PathPlanner:
         #This function performs RRT on the given map and robot
         #You do not need to demonstrate this function to the TAs, but it is left in for you to check your work
         new_node = self.nodes[0]
-        plt.imshow(self.occupancy_map)
+        # plt.imshow(self.occupancy_map)
         for i in range(ITERATIONS): #Most likely need more iterations than this to complete the map!
             #Sample map space
     
@@ -399,8 +399,8 @@ class PathPlanner:
             self.samples_so_far += 1
             # print(f"sampled point: {point}")
             # print(f"sampled point number: {self.samples_so_far}")
-            point_to_plot = self.point_to_cell(point)
-            plt.plot(point_to_plot[0], point_to_plot[1], 'ro')
+            # point_to_plot = self.point_to_cell(point)
+            # plt.plot(point_to_plot[0], point_to_plot[1], 'ro')
             if not self.headless:
                 self.window.add_point(point[:2].flatten(), radius = 2, color=(0,0,255))
             
@@ -553,9 +553,9 @@ class PathPlanner:
                     self.window.add_line(self.nodes[new_node.parent_id].robot_pose[:2].flatten(), new_node.robot_pose[:2].flatten(), width=2, color=(255,0,0))
                     new_node = self.nodes[new_node.parent_id]
                     # add line within points
-                    pizel_coords = self.point_to_cell(new_node.robot_pose[:2])
+                    # pizel_coords = self.point_to_cell(new_node.robot_pose[:2])
                     # plt.plot([new_node.robot_pose[0], self.goal_point[0]], [new_node.robot_pose[1], self.goal_point[1]], 'r-')
-                    plt.plot(pizel_coords[0], pizel_coords[1], 'ro')
+                    # plt.plot(pizel_coords[0], pizel_coords[1], 'ro')
 
                 # plt.show()
                 time.sleep(20)
@@ -587,22 +587,22 @@ def main():
     #Set map information
     map_filename = "myhal.png"
     map_setings_filename = "myhal.yaml"
-    # map_filename = "willowgarageworld_05res.png"
-    # map_setings_filename = "willowgarageworld_05res.yaml"
+    map_filename = "willowgarageworld_05res.png"
+    map_setings_filename = "willowgarageworld_05res.yaml"
 
 
     #robot information
-    # goal_point = np.array([[42], [-44]]) #m
+    goal_point = np.array([[42], [-44]]) #m
     # goal_point = np.  array([[10], [-15]]) #m 
     # goal_point = np.array([[5], [0]]) #m
-    goal_point = np.array([[7], [0]]) #m
+    # goal_point = np.array([[7], [0]]) #m
     stopping_dist = 0.5 #m
 
     #RRT precursor
     path_planner = PathPlanner(map_filename, map_setings_filename, goal_point, stopping_dist, headless=False)
     # path_planner = PathPlanner(map_filename, map_setings_filename, goal_point, stopping_dist, headless=True)
-    # nodes = path_planner.rrt_star_planning()
-    nodes = path_planner.rrt_planning()
+    nodes = path_planner.rrt_star_planning()
+    # nodes = path_planner.rrt_planning()
     print("Path Length: ", len(nodes))
     print(nodes[0].robot_pose)
     print(nodes[-1].robot_pose)
