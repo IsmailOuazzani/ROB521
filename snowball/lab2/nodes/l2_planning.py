@@ -39,12 +39,24 @@ def load_map_yaml(filename):
 
 #Node for building a graph
 class Node:
-    def __init__(self, robot_pose: np.ndarray, parent_id: int, cost_from_parent: float, cost: float):
+    def __init__(self, robot_pose: np.ndarray, parent_id: int, cost_from_parent: float, cost: float, children_ids: list[int] = []):
         self.robot_pose = robot_pose # A 3 by 1 vector [x, y, theta]
         self.parent_id = parent_id # The parent node id that leads to this node (There should only every be one parent in RRT)
         self.cost = cost # The cost to come to this node
-        self.children_ids = [] # The children node ids of this node
+        self.children_ids = children_ids # The children node ids of this node
         self.cost_from_parent = cost_from_parent
+        return
+    
+def update_children(nodes: list[Node], node_id: int):
+        #Given a node_id with a changed cost, update all connected nodes with the new cost
+        root = nodes[node_id]
+        queue = [root]
+        while queue:
+            node = queue.pop(0)
+            for child_id in node.children_ids:
+                child: Node = nodes[child_id]
+                child.cost = node.cost + child.cost_from_parent
+                queue.append(child)
         return
 
 class SlidingWindowSampler:
@@ -326,18 +338,6 @@ class PathPlanner:
         rollout[1,:] = np.linspace(node_i.robot_pose[1], point_f[1], int(final_t / self.timestep)).flatten()
 
         return rollout
-
-    def update_children(self, node_id: int):
-        #Given a node_id with a changed cost, update all connected nodes with the new cost
-        root = self.nodes[node_id]
-        queue = [root]
-        while queue:
-            node = queue.pop(0)
-            for child_id in node.children_ids:
-                child: Node = self.nodes[child_id]
-                child.cost = node.cost + child.cost_from_parent
-                queue.append(child)
-        return
     
     def collision_detected(self, robot_traj: np.ndarray) -> bool:
         # Check if the robot trajectory collides with the map
@@ -481,7 +481,7 @@ class PathPlanner:
                         node.cost_from_parent = cost_from_parent
                         node.cost = cost
                         new_node.children_ids.append(node_id)
-                        self.update_children(node_id) #WTF is this
+                        update_children(nodes=self.nodes, node_id=node_id) 
                         # plot trajectory
                         # if not self.headless:
                         #     for i in range(1, trajectory_o.shape[1]):
