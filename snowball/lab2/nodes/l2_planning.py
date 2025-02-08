@@ -2,15 +2,19 @@
 #Standard Libraries
 import numpy as np
 import yaml
-import pygame
-import time
 import pygame_utils
 import matplotlib.image as mpimg
 from skimage.draw import disk
-from scipy.linalg import block_diag
-from math import cos, sin, acos
+from math import cos, sin, acos, pi
 import random
+import matplotlib.pyplot as plt
+from typing import Tuple
 
+
+NODE_CLOSENESS_TOL = 0.01
+ITERATIONS = 13000
+SCALE_FACTOR_VEL = 1
+SCALE_FACTOR_ROT_VEL = 0.5
 
 def load_map(filename):
     im = mpimg.imread("../maps/" + filename)
@@ -28,11 +32,24 @@ def load_map_yaml(filename):
 
 #Node for building a graph
 class Node:
-    def __init__(self, robot_pose: np.ndarray, parent_id, cost):
+    def __init__(self, robot_pose: np.ndarray, parent_id: int, cost_from_parent: float, cost: float, children_ids: list[int] = []):
         self.robot_pose = robot_pose # A 3 by 1 vector [x, y, theta]
         self.parent_id = parent_id # The parent node id that leads to this node (There should only every be one parent in RRT)
         self.cost = cost # The cost to come to this node
-        self.children_ids = [] # The children node ids of this node
+        self.children_ids = children_ids # The children node ids of this node
+        self.cost_from_parent = cost_from_parent
+        return
+    
+def update_children(nodes: list[Node], node_id: int):
+        #Given a node_id with a changed cost, update all connected nodes with the new cost
+        root = nodes[node_id]
+        queue = [root]
+        while queue:
+            node = queue.pop(0)
+            for child_id in node.children_ids:
+                child: Node = nodes[child_id]
+                child.cost = node.cost + child.cost_from_parent
+                queue.append(child)
         return
 
 #Path Planner 
@@ -65,7 +82,7 @@ class PathPlanner:
         self.num_substeps = 10
 
         #Planning storage
-        self.nodes = [Node(np.zeros((3,1)), -1, 0)]
+        self.nodes = [Node(np.zeros((3,1)), -1, 0, 0)]
 
         #RRT* Specific Parameters
         self.lebesgue_free = np.sum(self.occupancy_map) * self.map_settings_dict["resolution"] **2
