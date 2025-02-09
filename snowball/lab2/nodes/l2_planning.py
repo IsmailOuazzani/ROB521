@@ -109,9 +109,9 @@ class PathPlanner:
         self.num_samples += 1
         return np.array([[random_x], [random_y]])
     
-    def check_if_duplicate(self, point):
+    def is_duplicate(self, point: np.ndarray) -> bool:
         #Check if point is a duplicate of an already existing node
-        print("TO DO: Check that nodes are not duplicates")
+        # TODO: implement this later, if we don't need it then we spare an O(n) operation
         return False
     
     def closest_node(self, point):
@@ -126,7 +126,7 @@ class PathPlanner:
         #point_s is the sampled point vector [x; y]
         vel, rot_vel = self.robot_controller(node_i, point_s)
 
-        robot_traj = self.trajectory_rollout(vel, rot_vel)
+        robot_traj = self.trajectory_rollout(node_i, vel, rot_vel)
         return robot_traj
     
     def robot_controller(self, node_i: Node, point_s: np.ndarray) -> tuple[float,float]:
@@ -150,10 +150,11 @@ class PathPlanner:
 
         return vel,rot_vel
             
-    def trajectory_rollout(self, vel: float, rot_vel: float):
+    def trajectory_rollout(self, node: Node, vel: float, rot_vel: float):
         # Given your chosen velocities determine the trajectory of the robot for your given timestep
         # The returned trajectory should be a series of points to check for collisions
         rollout = np.zeros((3, self.num_substeps))
+        rollout[:,0] = node.robot_pose.flatten()
         
         for i in range(1,self.num_substeps):
             # Forward Euler
@@ -248,12 +249,14 @@ class PathPlanner:
             for closest_node_id in closest_node_ids:
                 closest_node = self.nodes[closest_node_id]
                 trajectory_from_closest_node = self.simulate_trajectory(closest_node, point)
+
                 if self.is_collision_detected(trajectory_from_closest_node):
                     continue
-
-
-            #Check for collisions
-            print("TO DO: Check for collisions and add safe points to list of nodes.")
+                
+                if self.is_duplicate(trajectory_from_closest_node[:2,-1]):
+                    continue
+                
+                trajectory_cost = self.cost_to_come(trajectory_from_closest_node)
             
             #Check if goal has been reached
             print("TO DO: Check if at goal point.")

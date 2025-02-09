@@ -9,12 +9,17 @@ PLANNER = PathPlanner(
 )
 
 def test_trajectory_rollout():
-    
+    node = Node(
+        robot_pose=np.array([[0],[0],[0]]),
+        parent_id=None,
+        cost=0,
+        cost_from_parent=0
+    )
     vel=2.0
     rot_vel=0.0
 
     assert np.array_equal(
-    PLANNER.trajectory_rollout(vel=vel, rot_vel=rot_vel),
+    PLANNER.trajectory_rollout(node=node, vel=vel, rot_vel=rot_vel),
     np.array([
         [ 0.,  2.,  4.,  6.,  8., 10., 12., 14., 16., 18.],
         [ 0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.],
