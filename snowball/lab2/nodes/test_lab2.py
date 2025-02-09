@@ -106,3 +106,70 @@ def test_k_closest_nodes():
         planner.k_closest_nodes(test_point, 3),
         np.array([0, 4, 1])
   )
+
+
+
+
+def setup_planner_for_collision_tests():
+    """
+    Create a PathPlanner instance with a dummy occupancy map and map settings.
+    This bypasses file loading by overriding occupancy_map and map_settings_dict.
+    """
+    # We use dummy filenames because we override the loaded map.
+    planner = PathPlanner(
+        map_filename="myhal.png",
+        map_setings_filename="myhal.yaml",
+        goal_point=np.array([[0], [0]]),
+        stopping_dist=0.1
+    )
+    # Create a simple 10x10 occupancy map with all free cells (value 1)
+    dummy_map = np.ones((10, 10), dtype=np.uint8)
+    planner.occupancy_map = dummy_map
+    # Set map settings so that points are converted to indices in an easy way.
+    # Here we use a resolution of 1.0 and an origin at (0, 0).
+    planner.map_settings_dict = {"resolution": 1.0, "origin": [0, 0]}
+    # Set the bounds to match the dummy map (10 columns and 10 rows)
+    planner.bounds = np.array([[0, 10], [0, 10]])
+    # Choose a robot_radius that, when divided by resolution, is an integer (for simplicity)
+    planner.robot_radius = 1.0  # disk radius = 1
+    return planner
+
+def test_is_collision_detected_no_collision():
+    """
+    Test that a trajectory that stays in free space (all ones in the occupancy map)
+    does not result in a collision.
+    """
+    planner = setup_planner_for_collision_tests()
+    
+    # Create a trajectory that stays at (3,3) for all timesteps.
+    # The trajectory array has shape (3, N): first row is x, second is y, third is theta.
+    trajectory = np.array([
+         [3, 3, 3, 3],  # x-coordinates
+         [3, 3, 3, 3],  # y-coordinates
+         [0, 0, 0, 0]   # theta (unused in collision checking)
+    ])
+    
+    # Since the occupancy map is all free, no collision should be detected.
+    assert planner.is_collision_detected(trajectory) is False
+
+def test_is_collision_detected_with_collision():
+    """
+    Test that a trajectory that passes over an obstacle cell (value 0 in occupancy_map)
+    is correctly flagged as colliding.
+    """
+    planner = setup_planner_for_collision_tests()
+    
+    # Place an obstacle at cell (3,3). (Remember that after the coordinate conversion,
+    # a point at (3,3) in the world becomes cell (3,3) when resolution=1.0 and origin=(0,0).)
+    planner.occupancy_map[3, 3] = 0
+
+    # Create a trajectory that stays at (3,3) so that its footprint (computed via a disk of radius 1)
+    # will include the obstacle cell.
+    trajectory = np.array([
+         [3, 3, 3, 3],
+         [3, 3, 3, 3],
+         [0, 0, 0, 0]
+    ])
+    
+    # Because the robot’s footprint now covers an obstacle cell, a collision should be detected.
+    assert planner.is_collision_detected(trajectory) is True

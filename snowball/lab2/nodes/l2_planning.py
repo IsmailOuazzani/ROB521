@@ -64,10 +64,11 @@ class PathPlanner:
 
         #Get the metric bounds of the map
         self.bounds = np.zeros([2,2]) #m
+        self.resolution = self.map_settings_dict["resolution"]
         self.bounds[0, 0] = self.map_settings_dict["origin"][0]
         self.bounds[1, 0] = self.map_settings_dict["origin"][1]
-        self.bounds[0, 1] = self.map_settings_dict["origin"][0] + self.map_shape[1] * self.map_settings_dict["resolution"]
-        self.bounds[1, 1] = self.map_settings_dict["origin"][1] + self.map_shape[0] * self.map_settings_dict["resolution"]
+        self.bounds[0, 1] = self.map_settings_dict["origin"][0] + self.map_shape[1] * self.resolution
+        self.bounds[1, 1] = self.map_settings_dict["origin"][1] + self.map_shape[0] * self.resolution
 
         #Robot information
         self.robot_radius = 0.22 #m
@@ -183,13 +184,12 @@ class PathPlanner:
 
     def points_to_robot_circle(self, points: np.ndarray) -> np.ndarray:
         #Convert a series of [x,y] points to robot map footprints for collision detection
-        #Hint: The disk function is included to help you with this function
         all_points = []
         mapped_pts = self.point_to_cell(points)
         for pt in range(mapped_pts.shape[1]):
-            rr, cc = disk(radius=self.robot_radius, center=mapped_pts[:,pt])
-            all_points.append(np.vstack((cc,rr)))
-        return np.dstack(all_points)    
+            rr, cc = disk(radius=self.robot_radius/self.resolution, center=mapped_pts[:,pt])
+            all_points.append(np.vstack((rr,cc)))
+        return np.hstack(all_points)      
 
     #RRT* specific functions
     def ball_radius(self):
@@ -215,6 +215,15 @@ class PathPlanner:
         print("TO DO: Update the costs of connected nodes after rewiring.")
         return
     
+    def is_collision_detected(self, trajectory: np.ndarray) -> bool:
+        #Check if the trajectory is in collision with the map
+        coords = self.points_to_robot_circle(trajectory[:2, :]).reshape(2,-1)
+        col_indices, row_indices = coords[0], coords[1]
+        # ensure indices are within bounds
+        row_indices = np.clip(row_indices, 0, self.occupancy_map.shape[0]-1)
+        col_indices = np.clip(col_indices, 0, self.occupancy_map.shape[1]-1)
+        return bool(np.any(self.occupancy_map[row_indices, col_indices] == 0))
+    
     def k_closest_nodes(self, point: np.ndarray, k: int) -> np.ndarray:
         point = point.flatten()
         positions = np.array([node.robot_pose[:2].flatten() for node in self.nodes])
@@ -236,9 +245,12 @@ class PathPlanner:
 
             #Get the closest points. We test with multiple points because we often have nodes that are close to both sides of a wall.
             closest_node_ids = self.k_closest_nodes(point=point, k=5)
+            for closest_node_id in closest_node_ids:
+                closest_node = self.nodes[closest_node_id]
+                trajectory_from_closest_node = self.simulate_trajectory(closest_node, point)
+                if self.is_collision_detected(trajectory_from_closest_node):
+                    continue
 
-            #Simulate driving the robot towards the closest point
-            trajectory_o = self.simulate_trajectory(self.nodes[closest_node_id].point, point)
 
             #Check for collisions
             print("TO DO: Check for collisions and add safe points to list of nodes.")
