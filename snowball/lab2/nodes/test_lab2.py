@@ -21,7 +21,7 @@ def test_trajectory_rollout():
     assert np.array_equal(
     PLANNER.trajectory_rollout(node=node, vel=vel, rot_vel=rot_vel),
     np.array([
-        [ 0.,  2.,  4.,  6.,  8., 10., 12., 14., 16., 18.],
+        [ 0.,  1.,  2.,  3.,  4., 5., 6., 7., 8., 9.],
         [ 0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.],
         [ 0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.]
     ])
@@ -48,13 +48,12 @@ def test_simulatee_traj():
     PLANNER.simulate_trajectory(node_i=node, point_s=point)
 
 def test_point_to_cell():
-    origin = PLANNER.map_settings_dict["origin"][:2]
-    origin = np.array([[origin[0]], [origin[1]]])
-    mapped_pt = PLANNER.point_to_cell(np.array([[0],[0]]))
-    assert np.array_equal(mapped_pt, origin.astype(int))
+    mapped_pt = PLANNER.point_to_cell(np.array([[0], [0]]))
+    expected = PLANNER.origin_pixel.astype(int)
+    assert np.array_equal(mapped_pt, expected)
 
 def test_cost_of_trajectory():
-    trajectory = np.array([[0, 1, 2], [0, 0, 0]])
+    trajectory = np.array([[0, 1, 2], [0, 0, 0], [0, 0, 0]])
     assert cost_of_trajectory(trajectory) == 2
 
 
@@ -125,7 +124,6 @@ def setup_planner_for_collision_tests():
     Create a PathPlanner instance with a dummy occupancy map and map settings.
     This bypasses file loading by overriding occupancy_map and map_settings_dict.
     """
-    # We use dummy filenames because we override the loaded map.
     planner = PathPlanner(
         map_filename="myhal.png",
         map_setings_filename="myhal.yaml",
@@ -135,13 +133,19 @@ def setup_planner_for_collision_tests():
     # Create a simple 10x10 occupancy map with all free cells (value 1)
     dummy_map = np.ones((10, 10), dtype=np.uint8)
     planner.occupancy_map = dummy_map
-    # Set map settings so that points are converted to indices in an easy way.
-    # Here we use a resolution of 1.0 and an origin at (0, 0).
+    planner.map_shape = dummy_map.shape
+    # Use dummy settings: resolution 1.0 and origin at (0,0)
     planner.map_settings_dict = {"resolution": 1.0, "origin": [0, 0]}
-    # Set the bounds to match the dummy map (10 columns and 10 rows)
     planner.bounds = np.array([[0, 10], [0, 10]])
-    # Choose a robot_radius that, when divided by resolution, is an integer (for simplicity)
     planner.robot_radius = 1.0  # disk radius = 1
+
+    # Update dependent variables based on the new map settings.
+    planner.resolution = planner.map_settings_dict["resolution"]
+    planner.origin = planner.map_settings_dict["origin"]
+    planner.origin_pixel = np.zeros((2, 1))
+    planner.origin_pixel[0] = -planner.origin[0] / planner.resolution
+    planner.origin_pixel[1] = (planner.map_shape[0] * planner.resolution + planner.origin[1]) / planner.resolution
+
     return planner
 
 def test_is_collision_detected_no_collision():
@@ -169,17 +173,25 @@ def test_is_collision_detected_with_collision():
     """
     planner = setup_planner_for_collision_tests()
     
-    # Place an obstacle at cell (3,3). (Remember that after the coordinate conversion,
-    # a point at (3,3) in the world becomes cell (3,3) when resolution=1.0 and origin=(0,0).)
-    planner.occupancy_map[3, 3] = 0
+    # Compute the footprint for a single point at (3,3)
+    footprint = planner.points_to_robot_circle(np.array([[3], [3]]))
+    # Ensure the footprint is 2 x N (each column is one [x; y] cell)
+    footprint = footprint.reshape(2, -1)
+    # In your is_collision_detected, the occupancy map is indexed as:
+    #   row_indices = footprint[1] and col_indices = footprint[0]
+    # So we select the first footprint cell (for example) as our obstacle location.
+    obstacle_row = int(footprint[1, 0])
+    obstacle_col = int(footprint[0, 0])
+    
+    # Place an obstacle at that cell.
+    planner.occupancy_map[obstacle_row, obstacle_col] = 0
 
-    # Create a trajectory that stays at (3,3) so that its footprint (computed via a disk of radius 1)
-    # will include the obstacle cell.
+    # Create a trajectory that stays at (3,3) for all timesteps.
     trajectory = np.array([
-         [3, 3, 3, 3],
-         [3, 3, 3, 3],
-         [0, 0, 0, 0]
+         [3, 3, 3, 3],  # x-coordinates
+         [3, 3, 3, 3],  # y-coordinates
+         [0, 0, 0, 0]   # theta (unused in collision checking)
     ])
     
-    # Because the robot’s footprint now covers an obstacle cell, a collision should be detected.
+    # Now the footprint for (3,3) will include the forced obstacle.
     assert planner.is_collision_detected(trajectory) is True

@@ -55,11 +55,16 @@ def update_children(nodes: list[Node], node_id: int):
 
 def cost_of_trajectory(trajectory: np.ndarray) -> float:
     #Given a trajectory calculate the cost of the trajectory
-    total_cost = 0
-    for i in range(trajectory.shape[1] - 1):
-        total_cost += np.linalg.norm(trajectory[:2,i] - trajectory[:2,i+1])
-        # TODO: consider rotation?
-    return total_cost
+    cost = 0
+    for i in range(1, trajectory.shape[1]):
+        prev_pose = trajectory[:, i-1]
+        cur_pose = trajectory[:, i]
+        angle_to_target = np.arctan2(prev_pose[1] - cur_pose[1], prev_pose[0] - cur_pose[0])
+        cost += np.linalg.norm(trajectory[:2, i] - trajectory[:2, i-1])
+        # # TODO: should we include rotation cost?
+        # angle_diff = np.arctan2(np.sin(angle_to_target - cur_pose[2]), np.cos(angle_to_target - cur_pose[2]))
+        # cost += 1.5*abs(angle_diff)
+    return cost
 
 #Path Planner 
 class PathPlanner:
@@ -78,6 +83,10 @@ class PathPlanner:
         self.bounds[0, 1] = self.map_settings_dict["origin"][0] + self.map_shape[1] * self.resolution
         self.bounds[1, 1] = self.map_settings_dict["origin"][1] + self.map_shape[0] * self.resolution
 
+        self.origin = self.map_settings_dict["origin"]
+        self.origin_pixel = np.zeros((2,1)) # array containing the pixel coordinates of the origin
+        self.origin_pixel[0] = - self.origin[0] / self.resolution
+        self.origin_pixel[1] = (self.map_shape[0]*self.resolution + self.origin[1]) / self.resolution
         #Robot information
         self.robot_radius = 0.22 #m
         self.vel_max = 0.5 #m/s (Feel free to change!)
@@ -88,7 +97,7 @@ class PathPlanner:
         self.stopping_dist = stopping_dist #m
 
         #Trajectory Simulation Parameters
-        self.timestep = 1.0 #s
+        self.timestep = 0.5 #s
         self.num_substeps = 10
 
         #Planning storage
@@ -106,7 +115,7 @@ class PathPlanner:
         self.headless = headless
         if not self.headless:
             self.window = pygame_utils.PygameWindow(
-                "Path Planner", (1000, 1000), self.occupancy_map.shape, self.map_settings_dict, self.goal_point, self.stopping_dist)
+                map_filename, (1000, 1000), self.occupancy_map.shape, self.map_settings_dict, self.goal_point, self.stopping_dist)
         return
 
     #Functions required for RRT
@@ -117,9 +126,11 @@ class PathPlanner:
         self.num_samples += 1
         return np.array([[random_x], [random_y]])
     
-    def is_duplicate(self, point: np.ndarray) -> bool:
+    def is_duplicate(self, pose: np.ndarray) -> bool:
         #Check if point is a duplicate of an already existing node
-        # TODO: implement this later, if we don't need it then we spare an O(n) operation
+        for node in self.nodes:
+            if np.allclose(node.robot_pose, pose, atol=NODE_CLOSENESS_TOL):
+                return True
         return False
     
     def closest_node(self, point):
@@ -148,15 +159,19 @@ class PathPlanner:
         point_flat = point_s.flatten()
 
         
-        vel = (np.linalg.norm(robot_pose - point_flat) / dt).flatten()
-        rot_vel = -(acos(
-            np.dot(point_flat - robot_pose, np.array([[cos(theta)], [sin(theta)]]))/(np.linalg.norm(point_flat-robot_pose)))
-        )/dt
+        dist = np.linalg.norm(robot_pose - point_flat)
+        vel = (dist / dt).flatten() * SCALE_FACTOR_VEL
+        angle_to_target = np.arctan2(point_flat[1] - robot_pose[1], point_flat[0] - robot_pose[0])
+        angle_diff = np.arctan2(np.sin(angle_to_target - theta), np.cos(angle_to_target - theta))
+        # if angle_diff > np.pi/2:
+        #     vel = 0.001
 
+        # Compute rotational velocity
+        rot_vel = angle_diff / dt
         vel = float(min(vel, self.vel_max))
         rot_vel = float(np.sign(rot_vel) * min(abs(rot_vel), self.rot_vel_max))
 
-        return vel,rot_vel
+        return vel, rot_vel
             
     def trajectory_rollout(self, node: Node, vel: float, rot_vel: float):
         # Given your chosen velocities determine the trajectory of the robot for your given timestep
@@ -175,21 +190,11 @@ class PathPlanner:
     def point_to_cell(self, point: np.ndarray) -> np.ndarray:
         #Convert a series of [x,y] points in the map to the indices for the corresponding cell in the occupancy map
         #point is a 2 by N matrix of points of interest
-        c = self.map_settings_dict["resolution"]
-        k = np.array([
-            [c, 0, self.bounds[0,0]],
-            [0, c, self.bounds[1,0]],
-            [0, 0, 1]
-        ])
-        num_points = point.shape[1]
-        ones = np.ones((1,num_points))
-        homo_point = np.vstack((point,ones))
-
-        transformed = k @ homo_point
-        x_normalized = transformed[0, :] / transformed[2, :]
-        y_normalized = transformed[1, :] / transformed[2, :]
-        cell_indices = np.vstack((x_normalized, y_normalized))
-        return cell_indices.astype(int)
+        pixel_coords = np.zeros_like(point)
+        for i in range(point.shape[1]):
+            pixel_coords[0,i] = (point[0,i])/self.resolution + self.origin_pixel[0] 
+            pixel_coords[1,i] = self.origin_pixel[1] - (point[1,i])/self.resolution
+        return pixel_coords
 
     def points_to_robot_circle(self, points: np.ndarray) -> np.ndarray:
         #Convert a series of [x,y] points to robot map footprints for collision detection
@@ -233,9 +238,14 @@ class PathPlanner:
         positions = np.array([node.robot_pose[:2].flatten() for node in self.nodes])
         diff = positions - point  # shape: (n, 2)
         dists_sq = np.sum(diff**2, axis=1)
+        k = min(k, len(self.nodes))
         k_smallest_indices = np.argpartition(dists_sq, k - 1)[:k]
         sorted_k_indices = k_smallest_indices[np.argsort(dists_sq[k_smallest_indices])]
         return sorted_k_indices
+    
+    def add_node(self, parent_node_id: int, new_node_id: int, new_node: Node):
+        self.nodes.append(new_node)
+        self.nodes[parent_node_id].children_ids.append(new_node_id)
 
     #Planner Functions
     def rrt_planning(self):
@@ -256,14 +266,30 @@ class PathPlanner:
                 if self.is_collision_detected(trajectory_from_closest_node):
                     continue
                 
-                if self.is_duplicate(trajectory_from_closest_node[:2,-1]):
+                if self.is_duplicate(trajectory_from_closest_node[:,-1]):
                     continue
                 
-                trajectory_cost = cost_of_trajectory(trajectory_from_closest_node)
+                new_node = Node(
+                    robot_pose=trajectory_from_closest_node[:,-1].reshape(3,1),
+                    parent_id=closest_node_id,
+                    cost_from_parent=0, # RRT does not need cost
+                    cost=0,
+                )
+                new_node_id = len(self.nodes)
+                self.add_node(closest_node_id, new_node_id, new_node)
+                if not self.headless:
+                    for i in range(1, trajectory_from_closest_node.shape[1]):
+                        self.window.add_point(trajectory_from_closest_node[:2,i], radius=2, color=(0,255,0))
+                break #We only need to add one node per iteration
             
+            # Logging
+            if i % 100 == 0:
+                print(f"Sampled {self.num_samples} points, iter {i}")
+
             #Check if goal has been reached
-            print("TO DO: Check if at goal point.")
-        return self.nodes
+            if np.linalg.norm(self.nodes[-1].robot_pose[:2] - self.goal_point) < self.stopping_dist:
+                print("Goal Reached!")
+                return self.nodes
     
     def rrt_star_planning(self):
         #This function performs RRT* for the given map and robot        
@@ -315,12 +341,13 @@ def main():
     map_setings_filename = "willowgarageworld_05res.yaml"
 
     #robot information
-    goal_point = np.array([[10], [10]]) #m
+    # goal_point = np.array([[10], [10]]) #m
+    goal_point = np.array([[42], [-44]]) #m
     stopping_dist = 0.5 #m
 
     #RRT precursor
-    path_planner = PathPlanner(map_filename, map_setings_filename, goal_point, stopping_dist)
-    nodes = path_planner.rrt_star_planning()
+    path_planner = PathPlanner(map_filename, map_setings_filename, goal_point, stopping_dist, headless=False)
+    nodes = path_planner.rrt_planning()
     node_path_metric = np.hstack(path_planner.recover_path())
 
     #Leftover test functions
