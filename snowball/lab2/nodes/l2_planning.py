@@ -53,6 +53,14 @@ def update_children(nodes: list[Node], node_id: int):
                 queue.append(child)
         return
 
+def cost_of_trajectory(trajectory: np.ndarray) -> float:
+    #Given a trajectory calculate the cost of the trajectory
+    total_cost = 0
+    for i in range(trajectory.shape[1] - 1):
+        total_cost += np.linalg.norm(trajectory[:2,i] - trajectory[:2,i+1])
+        # TODO: consider rotation?
+    return total_cost
+
 #Path Planner 
 class PathPlanner:
     #A path planner capable of perfomring RRT and RRT*
@@ -206,11 +214,6 @@ class PathPlanner:
         print("TO DO: Implement a way to connect two already existing nodes (for rewiring).")
         return np.zeros((3, self.num_substeps))
     
-    def cost_to_come(self, trajectory_o):
-        #The cost to get to a node from lavalle 
-        print("TO DO: Implement a cost to come metric")
-        return 0
-    
     def update_children(self, node_id):
         #Given a node_id with a changed cost, update all connected nodes with the new cost
         print("TO DO: Update the costs of connected nodes after rewiring.")
@@ -256,7 +259,7 @@ class PathPlanner:
                 if self.is_duplicate(trajectory_from_closest_node[:2,-1]):
                     continue
                 
-                trajectory_cost = self.cost_to_come(trajectory_from_closest_node)
+                trajectory_cost = cost_of_trajectory(trajectory_from_closest_node)
             
             #Check if goal has been reached
             print("TO DO: Check if at goal point.")

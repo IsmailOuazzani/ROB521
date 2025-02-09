@@ -1,4 +1,4 @@
-from .l2_planning import PathPlanner, Node, update_children
+from .l2_planning import PathPlanner, Node, update_children, cost_of_trajectory
 import numpy as np
 
 PLANNER = PathPlanner(
@@ -52,6 +52,11 @@ def test_point_to_cell():
     origin = np.array([[origin[0]], [origin[1]]])
     mapped_pt = PLANNER.point_to_cell(np.array([[0],[0]]))
     assert np.array_equal(mapped_pt, origin.astype(int))
+
+def test_cost_of_trajectory():
+    trajectory = np.array([[0, 1, 2], [0, 0, 0]])
+    assert cost_of_trajectory(trajectory) == 2
+
 
 def test_update_children():
     nodes = [
