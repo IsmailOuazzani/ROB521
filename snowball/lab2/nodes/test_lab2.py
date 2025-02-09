@@ -85,3 +85,24 @@ def test_update_children():
     update_children(nodes, root_id)
     assert nodes[2].cost == 4
     assert nodes[3].cost == 6
+
+
+def test_k_closest_nodes():
+  planner = PathPlanner(
+        map_filename="myhal.png",
+        map_setings_filename="myhal.yaml",
+        goal_point=np.array([[3], [3]]),
+        stopping_dist=0.1
+    )
+  planner.nodes = [
+        Node(np.array([[0.0], [0.0], [0.0]]), -1, 0, 0),  # Node 0
+        Node(np.array([[1.0], [0.0], [0.0]]), 0, 0, 0),     # Node 1
+        Node(np.array([[0.0], [1.1], [0.0]]), 0, 0, 0),     # Node 2
+        Node(np.array([[2.0], [2.0], [0.0]]), 0, 0, 0),     # Node 3
+        Node(np.array([[0.5], [0.5], [0.0]]), 0, 0, 0)      # Node 4
+    ]
+  test_point = np.array([[0.0], [0.0]])
+  np.testing.assert_array_equal(
+        planner.k_closest_nodes(test_point, 3),
+        np.array([0, 4, 1])
+  )

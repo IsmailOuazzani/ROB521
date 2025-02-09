@@ -8,7 +8,8 @@ from skimage.draw import disk
 from math import cos, sin, acos, pi
 import random
 import matplotlib.pyplot as plt
-from typing import Tuple
+from typing import Tuple, List
+import heapq
 
 
 NODE_CLOSENESS_TOL = 0.01
@@ -83,6 +84,7 @@ class PathPlanner:
 
         #Planning storage
         self.nodes = [Node(np.zeros((3,1)), -1, 0, 0)]
+        self.num_samples = 0
 
         #RRT* Specific Parameters
         self.lebesgue_free = np.sum(self.occupancy_map) * self.map_settings_dict["resolution"] **2
@@ -91,8 +93,9 @@ class PathPlanner:
         self.gamma_RRT = self.gamma_RRT_star + .1
         self.epsilon = 2.5
         
-        if not headless:
-            #Pygame window for visualization
+        #Pygame window for visualization
+        self.headless = headless
+        if not self.headless:
             self.window = pygame_utils.PygameWindow(
                 "Path Planner", (1000, 1000), self.occupancy_map.shape, self.map_settings_dict, self.goal_point, self.stopping_dist)
         return
@@ -100,10 +103,10 @@ class PathPlanner:
     #Functions required for RRT
     def sample_map_space(self) -> np.ndarray:
         #Return an [x,y] coordinate to drive the robot towards
-        random_x = random.random() * (self.map_shape[0,1] - self.map_shape[0,0])
-        random_y = random.random() * (self.map_shape[1,1] - self.map_shape[1,0])
-
-        return np.array([[random_x],[random_y]])
+        random_x = float(np.random.uniform(self.bounds[0,0], self.bounds[0,1]))
+        random_y = float(np.random.uniform(self.bounds[1,0], self.bounds[1,1]))
+        self.num_samples += 1
+        return np.array([[random_x], [random_y]])
     
     def check_if_duplicate(self, point):
         #Check if point is a duplicate of an already existing node
@@ -211,18 +214,28 @@ class PathPlanner:
         #Given a node_id with a changed cost, update all connected nodes with the new cost
         print("TO DO: Update the costs of connected nodes after rewiring.")
         return
+    
+    def k_closest_nodes(self, point: np.ndarray, k: int) -> np.ndarray:
+        point = point.flatten()
+        positions = np.array([node.robot_pose[:2].flatten() for node in self.nodes])
+        diff = positions - point  # shape: (n, 2)
+        dists_sq = np.sum(diff**2, axis=1)
+        k_smallest_indices = np.argpartition(dists_sq, k - 1)[:k]
+        sorted_k_indices = k_smallest_indices[np.argsort(dists_sq[k_smallest_indices])]
+        return sorted_k_indices
 
     #Planner Functions
     def rrt_planning(self):
         #This function performs RRT on the given map and robot
-        #You do not need to demonstrate this function to the TAs, but it is left in for you to check your work
-        for i in range(1): #Most likely need more iterations than this to complete the map!
+        for i in range(ITERATIONS): 
+            
             #Sample map space
             point = self.sample_map_space()
-            
+            if not self.headless:
+                self.window.add_point(point[:2].flatten(), radius = 2, color=(0,0,255))
 
-            #Get the closest point
-            closest_node_id = self.closest_node(point)
+            #Get the closest points. We test with multiple points because we often have nodes that are close to both sides of a wall.
+            closest_node_ids = self.k_closest_nodes(point=point, k=5)
 
             #Simulate driving the robot towards the closest point
             trajectory_o = self.simulate_trajectory(self.nodes[closest_node_id].point, point)
