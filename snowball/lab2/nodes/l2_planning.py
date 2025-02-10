@@ -352,7 +352,7 @@ class PathPlanner:
     #RRT* specific functions
     def ball_radius(self):
         #Close neighbor distance
-        card_V = len(self.nodes)
+        card_V = len(self.nodes) % int(self.sampler.num_steps)
         return min(self.gamma_RRT * (np.log(card_V) / card_V ) ** (1.0/2.0), self.epsilon)
     
     def connect_node_to_point(self, node_i: Node, point_f: np.ndarray) -> np.ndarray:
@@ -362,7 +362,7 @@ class PathPlanner:
         #point is a 2 by 1 point
         # diregard theta
         dist = np.linalg.norm(node_i.robot_pose - point_f.flatten())
-        vel = self.vel_max * 0.1
+        vel = self.vel_max
         final_t = dist / vel
         rollout = np.zeros((3, int(final_t / self.timestep)))
         rollout[0,:] = np.linspace(node_i.robot_pose[0], point_f[0], int(final_t / self.timestep)).flatten()
@@ -615,8 +615,8 @@ def main():
     #RRT precursor
     path_planner = PathPlanner(map_filename, map_setings_filename, goal_point, stopping_dist, headless=False)
     # path_planner = PathPlanner(map_filename, map_setings_filename, goal_point, stopping_dist, headless=True)
-    # nodes = path_planner.rrt_star_planning()
-    nodes = path_planner.rrt_planning()
+    nodes = path_planner.rrt_star_planning()
+    # nodes = path_planner.rrt_planning()
     print("Path Length: ", len(nodes))
     print(nodes[0].robot_pose)
     print(nodes[-1].robot_pose)
