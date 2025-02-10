@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from typing import Tuple, List
 import time
 
-NODE_CLOSENESS_TOL = 0.01
+NODE_CLOSENESS_TOL = 0.1
 ITERATIONS = 13000
 SCALE_FACTOR_VEL = 1
 SCALE_FACTOR_ROT_VEL = 0.5
@@ -138,7 +138,7 @@ class PathPlanner:
         self.sampler3 = SlidingWindowSampler((50,60), (2, 2), overlap=0.15, total_samples=int(2000))
 
         #Robot information
-        self.robot_radius = 0.22 #m
+        self.robot_radius = 0.25 #m
         self.vel_max = 0.5 #m/s (Feel free to change!)
         self.rot_vel_max = 0.2 #rad/s (Feel free to change!)
 
@@ -174,9 +174,13 @@ class PathPlanner:
         #Return an [x,y] coordinate to drive the robot towards
         self.num_samples += 1
         if self.uniform_sampling:
-          random_x = float(np.random.uniform(self.bounds[0,0], self.bounds[0,1]))
-          random_y = float(np.random.uniform(self.bounds[1,0], self.bounds[1,1]))
-          return np.array([[random_x], [random_y]])
+            if self.num_samples < 2000:
+                random_x = float(np.random.uniform(-5,50))
+                random_y = float(np.random.uniform(-45,15))
+            else:
+                random_x = float(np.random.uniform(self.goal_point[0] - 7.5,self. goal_point[0] + 2.5))
+                random_y = float(np.random.uniform(self.goal_point[1] - 2.5, self.goal_point[1] + 2.5))
+            return np.array([[random_x], [random_y]])
         else: # Smarter sampling, only works on the willowgarage map TODO: generalize
           if self.num_samples < self.sampler.total_samples:
             return self.sampler.sample() + np.array([[-5], [15]])
@@ -355,7 +359,7 @@ class PathPlanner:
             
             # Logging
             if i % 100 == 0:
-                print(f"Sampled {self.num_samples} points, iter {i}")
+                print(f"Sampled {self.num_samples} points, num nodes: {len(self.nodes)}")
 
             #Check if goal has been reached
             if np.linalg.norm(self.nodes[-1].robot_pose[:2] - self.goal_point) < self.stopping_dist:
@@ -396,68 +400,72 @@ class PathPlanner:
                 self.window.add_point(point[:2].flatten(), radius = 2, color=(0,0,255))
 
             #Closest Nodes
-            closest_nodes_ids_k = self.k_closest_nodes(point, 1)
+            closest_nodes_ids_k = self.k_closest_nodes(point, 5)
             for closest_node_id in closest_nodes_ids_k:
-              closest_node: Node = self.nodes[closest_node_id]
+                closest_node: Node = self.nodes[closest_node_id]
 
-              trajectory_from_closest_node = self.simulate_trajectory(self.nodes[closest_node_id], point)
+                trajectory_from_closest_node = self.simulate_trajectory(self.nodes[closest_node_id], point)
 
-              if self.is_collision_detected(trajectory_from_closest_node):
-                  continue
+                if self.is_collision_detected(trajectory_from_closest_node):
+                    continue
               
               # # Commenting out to save O(n) time
-              # if self.is_duplicate(trajectory_from_closest_node[:,-1]):
-              #     continue
+                if self.is_duplicate(trajectory_from_closest_node[:,-1]):
+                    continue
 
-              trajectory_from_closest_node_cost = cost_of_trajectory(trajectory_from_closest_node) 
-              new_node_id = len(self.nodes)
-              new_node = Node(
-                  robot_pose=trajectory_from_closest_node[:,-1].reshape(3,1),
-                  parent_id=closest_node_id,
-                  cost_from_parent=trajectory_from_closest_node_cost,
-                  cost=closest_node.cost + trajectory_from_closest_node_cost,
-              )
-              self.add_node(parent_node_id=closest_node_id, 
-                            new_node_id=new_node_id, 
-                            new_node=new_node)
+                trajectory_from_closest_node_cost = cost_of_trajectory(trajectory_from_closest_node) 
+                new_node_id = len(self.nodes)
+                new_node = Node(
+                    robot_pose=trajectory_from_closest_node[:,-1].reshape(3,1),
+                    parent_id=closest_node_id,
+                    cost_from_parent=trajectory_from_closest_node_cost,
+                    cost=closest_node.cost + trajectory_from_closest_node_cost,
+                )
+                self.add_node(parent_node_id=closest_node_id, 
+                                new_node_id=new_node_id, 
+                                new_node=new_node)
               
-              # Rewiring
-              ball_radius = self.ball_radius()
-              nodes_ids_in_radius = self.nodes_in_radius(new_node_id, ball_radius)
-              for node_id in nodes_ids_in_radius:
-                  if node_id == new_node_id:
-                      continue
-                  node = self.nodes[node_id]
-                  trajectory_from_node = self.simulate_trajectory(node, new_node.robot_pose[:2])
-                  if self.is_collision_detected(trajectory_from_node):
-                      continue
-                  trajectory_from_node_cost = cost_of_trajectory(trajectory_from_node)
-                  if node.cost + trajectory_from_node_cost < new_node.cost:
-                      self.change_parent(node_id=new_node_id, new_parent_id=node_id, new_cost_from_parent=trajectory_from_node_cost)
+                # Rewiring
+                ball_radius = self.ball_radius()
+                nodes_ids_in_radius = self.nodes_in_radius(new_node_id, ball_radius)
+                for node_id in nodes_ids_in_radius:
+                    if node_id == new_node_id:
+                        continue
+                    node = self.nodes[node_id]
+                    trajectory_from_node = self.simulate_trajectory(node, new_node.robot_pose[:2])
+                    if self.is_collision_detected(trajectory_from_node):
+                        continue
+                    trajectory_from_node_cost = cost_of_trajectory(trajectory_from_node)
+                    if node.cost + trajectory_from_node_cost < new_node.cost:
+                        self.change_parent(node_id=new_node_id, new_parent_id=node_id, new_cost_from_parent=trajectory_from_node_cost)
 
-              if not self.headless:
-                    trajectory_o = self.connect_node_to_point(new_node, self.nodes[new_node.parent_id].robot_pose[:2])
-                    for i in range(1, trajectory_o.shape[1]):
-                            self.window.add_point(trajectory_o[:2,i], radius=2, color=(0,255,0))
+                if not self.headless:
+                        trajectory_o = self.connect_node_to_point(new_node, self.nodes[new_node.parent_id].robot_pose[:2])
+                        for i in range(1, trajectory_o.shape[1]):
+                                self.window.add_point(trajectory_o[:2,i], radius=2, color=(0,255,0))
                             
-              # Close nodes rewire
-              for node_id in nodes_ids_in_radius:
-                  if node_id == new_node_id:
-                      continue
-                  node = self.nodes[node_id]
-                  trajectory_from_node = self.connect_node_to_point(node, new_node.robot_pose[:2])
-                  trajectory_from_node[2,trajectory_from_node.shape[1]-1] = node.robot_pose[2]
-                  if self.is_collision_detected(trajectory_from_node):
-                      continue
-                  trajectory_from_node_cost = cost_of_trajectory(trajectory_from_node)
-                  if new_node.cost + trajectory_from_node_cost < node.cost:
-                      self.change_parent(node_id=node_id, new_parent_id=new_node_id, new_cost_from_parent=trajectory_from_node_cost)
-                      update_children(nodes=self.nodes, node_id=node_id)
-                      
+                # Close nodes rewire
+                for node_id in nodes_ids_in_radius:
+                    if node_id == new_node_id:
+                        continue
+                    node = self.nodes[node_id]
+                    trajectory_from_node = self.connect_node_to_point(node, new_node.robot_pose[:2])
+                    trajectory_from_node[2,-1] = node.robot_pose[2]
+                    if self.is_collision_detected(trajectory_from_node):
+                        continue
+                    trajectory_from_node_cost = cost_of_trajectory(trajectory_from_node)
+                    if new_node.cost + trajectory_from_node_cost < node.cost:
+                        self.change_parent(node_id=node_id, new_parent_id=new_node_id, new_cost_from_parent=trajectory_from_node_cost)
+                        update_children(nodes=self.nodes, node_id=node_id)
+                        # Plor the new path
+                        if not self.headless:
+                            for i in range(1, trajectory_from_node.shape[1]):
+                                self.window.add_point(trajectory_from_node[:2,i], radius=2, color=(255,0,255))
+                break     
 
             # Logging
             if i % 100 == 0:
-                print(f"Sampled {self.num_samples} points, iter {i}")
+                print(f"Sampled {self.num_samples} points, num nodes: {len(self.nodes)}")
 
             #Check if goal has been reached
             if np.linalg.norm(self.nodes[-1].robot_pose[:2] - self.goal_point) < self.stopping_dist:
@@ -500,17 +508,6 @@ def main():
     stopping_dist = 0.5 #m
 
     #RRT
-    # path_planner = PathPlanner(map_filename, 
-    #                            map_setings_filename, 
-    #                            goal_point, 
-    #                            stopping_dist, 
-    #                            headless=False, 
-    #                            uniform_sampling=False,
-    #                            point_and_shoot=True)
-    # nodes = path_planner.rrt_planning()
-    # node_path_metric = np.hstack(path_planner.recover_path())
-
-    #RRT*
     path_planner = PathPlanner(map_filename, 
                                map_setings_filename, 
                                goal_point, 
@@ -518,8 +515,19 @@ def main():
                                headless=False, 
                                uniform_sampling=False,
                                point_and_shoot=True)
-    nodes = path_planner.rrt_star_planning()
+    nodes = path_planner.rrt_planning()
     node_path_metric = np.hstack(path_planner.recover_path())
+
+    #RRT*
+    # path_planner = PathPlanner(map_filename, 
+    #                            map_setings_filename, 
+    #                            goal_point, 
+    #                            stopping_dist, 
+    #                            headless=False, 
+    #                            uniform_sampling=False,
+    #                            point_and_shoot=True)
+    # nodes = path_planner.rrt_star_planning()
+    # node_path_metric = np.hstack(path_planner.recover_path())
 
     #Leftover test functions
     np.save("shortest_path.npy", node_path_metric)
