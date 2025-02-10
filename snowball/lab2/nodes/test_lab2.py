@@ -195,3 +195,35 @@ def test_is_collision_detected_with_collision():
     
     # Now the footprint for (3,3) will include the forced obstacle.
     assert planner.is_collision_detected(trajectory) is True
+
+
+def test_nodes_in_radius():
+    import numpy as np
+    # Create a dummy planner instance. (The file names here are dummies; the test
+    # overrides the nodes, so the map loading is not used.)
+    planner = PathPlanner(
+        map_filename="myhal.png",
+        map_setings_filename="myhal.yaml",
+        goal_point=np.array([[0], [0]]),
+        stopping_dist=0.1
+    )
+
+    # Overwrite the planner's nodes with our known test nodes.
+    planner.nodes = [
+        Node(np.array([[0.0], [0.0], [0.0]]), -1, 0, 0),  # Node 0 at (0, 0)
+        Node(np.array([[1.0], [1.0], [0.0]]), 0, 0, 0),     # Node 1 at (1, 1)
+        Node(np.array([[2.0], [2.0], [0.0]]), 0, 0, 0),     # Node 2 at (2, 2)
+        Node(np.array([[0.0], [1.0], [0.0]]), 0, 0, 0),     # Node 3 at (0, 1)
+        Node(np.array([[0.0], [2.0], [0.0]]), 0, 0, 0)      # Node 4 at (0, 2)
+    ]
+
+    # Using node 0 as the center, choose a radius of 1.5.
+    # Expected nodes: 0, 1, and 3.
+    expected_indices = np.array([0, 1, 3])
+    
+    # Call nodes_in_radius on node 0.
+    indices = planner.nodes_in_radius(node_id=0, radius=1.5)
+    
+    # Since the function returns a numpy array of indices, we can use np.testing.assert_array_equal.
+    # Sorting the result to ensure the order matches our expected order.
+    np.testing.assert_array_equal(np.sort(indices), expected_indices)
