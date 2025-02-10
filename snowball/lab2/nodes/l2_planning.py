@@ -32,11 +32,11 @@ def load_map_yaml(filename):
 
 #Node for building a graph
 class Node:
-    def __init__(self, robot_pose: np.ndarray, parent_id: int, cost_from_parent: float, cost: float, children_ids: list[int] = []):
+    def __init__(self, robot_pose: np.ndarray, parent_id: int, cost_from_parent: float, cost: float, children_ids: list[int]|None = None):
         self.robot_pose = robot_pose # A 3 by 1 vector [x, y, theta]
         self.parent_id = parent_id # The parent node id that leads to this node (There should only every be one parent in RRT)
         self.cost = cost # The cost to come to this node
-        self.children_ids = children_ids # The children node ids of this node
+        self.children_ids = children_ids if children_ids else [] # The children node ids of this node
         self.cost_from_parent = cost_from_parent
         return
     
