@@ -392,8 +392,10 @@ class PathPlanner:
         old_parent_id = node.parent_id
         node.parent_id = new_parent_id
         self.nodes[new_parent_id].children_ids.append(node_id)
-        self.nodes[old_parent_id].children_ids.remove(node_id)
+        if old_parent_id != -1:
+          self.nodes[old_parent_id].children_ids.remove(node_id)
         node.cost_from_parent = new_cost_from_parent
+        node.cost = self.nodes[new_parent_id].cost + new_cost_from_parent
     
     def rrt_star_planning(self):
         #This function performs RRT* for the given map and robot        
@@ -523,7 +525,7 @@ def main():
                                goal_point, 
                                stopping_dist, 
                                headless=False, 
-                               uniform_sampling=True,
+                               uniform_sampling=False,
                                point_and_shoot=True)
     nodes = path_planner.rrt_star_planning()
     node_path_metric = np.hstack(path_planner.recover_path())
