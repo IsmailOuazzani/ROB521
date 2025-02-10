@@ -66,10 +66,62 @@ def cost_of_trajectory(trajectory: np.ndarray) -> float:
         # cost += 1.5*abs(angle_diff)
     return cost
 
+class SlidingWindowSampler:
+    def __init__(self, map_size, window_size, overlap=0.5, total_samples=100, switch=False):
+        self.map_size = map_size  # (width, height)
+        self.window_size = window_size  # (w, h)
+        self.overlap = overlap  # Overlap percentage (0 to 1)
+        self.switch = switch # Top down or left to right
+        self.window_positions = self._generate_window_positions()
+        self.num_steps = total_samples // len(self.window_positions)
+        self.total_samples = total_samples
+        self.current_step = 0
+
+    def _generate_window_positions(self):
+        """Create a grid of window positions with overlap."""
+        step_x = int(self.window_size[0] * (1 - self.overlap))  # Move less than full width
+        step_y = int(self.window_size[1] * (1 - self.overlap))  # Move less than full height
+
+        # Ensure at least one step is taken
+        step_x = max(1, step_x)
+        step_y = max(1, step_y)
+
+        if not self.switch:
+            positions = [
+                (x, y)
+                for x in range(0, self.map_size[0] - self.window_size[0] + 1, step_x)
+                for y in range(0, self.map_size[1] - self.window_size[1] + 1, step_y)
+            ]
+        else:
+            positions = [
+                (x, y)
+                for y in range(0, self.map_size[1] - self.window_size[1] + 1, step_y)
+                for x in range(0, self.map_size[0] - self.window_size[0] + 1, step_x)]
+        return positions
+
+    def sample(self):
+        """Sample `num_samples` points within the current window."""
+        if not self.window_positions:
+            raise ValueError("No window positions generated.")
+
+        # Get the current window position
+        window_x, window_y = self.window_positions[self.current_step // self.num_steps]
+
+        # Generate random points within the window
+        x = np.random.uniform(window_x, window_x + self.window_size[0])
+        y = np.random.uniform(-window_y, -window_y - self.window_size[1])
+
+        # Move to the next window after `num_steps` iterations
+        self.current_step += 1
+        if self.current_step // self.num_steps >= len(self.window_positions):
+            self.current_step = 0  # Reset after covering the whole map
+
+        return np.array([[x], [y]])
+
 #Path Planner 
 class PathPlanner:
     #A path planner capable of perfomring RRT and RRT*
-    def __init__(self, map_filename, map_setings_filename, goal_point, stopping_dist, headless: bool = True):
+    def __init__(self, map_filename, map_setings_filename, goal_point, stopping_dist, headless: bool = True, uniform_sampling: bool = False):
         #Get map information
         self.occupancy_map = load_map(map_filename)
         self.map_shape = self.occupancy_map.shape
@@ -87,6 +139,11 @@ class PathPlanner:
         self.origin_pixel = np.zeros((2,1)) # array containing the pixel coordinates of the origin
         self.origin_pixel[0] = - self.origin[0] / self.resolution
         self.origin_pixel[1] = (self.map_shape[0]*self.resolution + self.origin[1]) / self.resolution
+
+        # Sampler
+        self.uniform_sampling = uniform_sampling
+        self.sampler = SlidingWindowSampler((50,60), (10, 10), overlap=0.2, total_samples=int(2000), switch=False)
+
         #Robot information
         self.robot_radius = 0.22 #m
         self.vel_max = 0.5 #m/s (Feel free to change!)
@@ -119,12 +176,15 @@ class PathPlanner:
         return
 
     #Functions required for RRT
-    def sample_map_space(self) -> np.ndarray:
+    def sample_map_space(self, uniform: bool) -> np.ndarray:
         #Return an [x,y] coordinate to drive the robot towards
-        random_x = float(np.random.uniform(self.bounds[0,0], self.bounds[0,1]))
-        random_y = float(np.random.uniform(self.bounds[1,0], self.bounds[1,1]))
         self.num_samples += 1
-        return np.array([[random_x], [random_y]])
+        if uniform:
+          random_x = float(np.random.uniform(self.bounds[0,0], self.bounds[0,1]))
+          random_y = float(np.random.uniform(self.bounds[1,0], self.bounds[1,1]))
+          return np.array([[random_x], [random_y]])
+        else:
+          return self.sampler.sample()
     
     def is_duplicate(self, pose: np.ndarray) -> bool:
         #Check if point is a duplicate of an already existing node
@@ -253,7 +313,7 @@ class PathPlanner:
         for i in range(ITERATIONS): 
             
             #Sample map space
-            point = self.sample_map_space()
+            point = self.sample_map_space(uniform=self.uniform_sampling)
             if not self.headless:
                 self.window.add_point(point[:2].flatten(), radius = 2, color=(0,0,255))
 
@@ -266,8 +326,9 @@ class PathPlanner:
                 if self.is_collision_detected(trajectory_from_closest_node):
                     continue
                 
-                if self.is_duplicate(trajectory_from_closest_node[:,-1]):
-                    continue
+                # # Skip to save O(n) time
+                # if self.is_duplicate(trajectory_from_closest_node[:,-1]):
+                #     continue
                 
                 new_node = Node(
                     robot_pose=trajectory_from_closest_node[:,-1].reshape(3,1),
@@ -346,7 +407,7 @@ def main():
     stopping_dist = 0.5 #m
 
     #RRT precursor
-    path_planner = PathPlanner(map_filename, map_setings_filename, goal_point, stopping_dist, headless=False)
+    path_planner = PathPlanner(map_filename, map_setings_filename, goal_point, stopping_dist, headless=False, uniform_sampling=False)
     nodes = path_planner.rrt_planning()
     node_path_metric = np.hstack(path_planner.recover_path())
 
