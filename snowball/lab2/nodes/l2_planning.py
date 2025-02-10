@@ -121,7 +121,7 @@ class SlidingWindowSampler:
 #Path Planner 
 class PathPlanner:
     #A path planner capable of perfomring RRT and RRT*
-    def __init__(self, map_filename, map_setings_filename, goal_point, stopping_dist, headless: bool = True, uniform_sampling: bool = False):
+    def __init__(self, map_filename, map_setings_filename, goal_point, stopping_dist, headless: bool = True, uniform_sampling: bool = False, point_and_shoot: bool = False):
         #Get map information
         self.occupancy_map = load_map(map_filename)
         self.map_shape = self.occupancy_map.shape
@@ -156,6 +156,7 @@ class PathPlanner:
         #Trajectory Simulation Parameters
         self.timestep = 0.5 #s
         self.num_substeps = 10
+        self.point_and_shoot = point_and_shoot
 
         #Planning storage
         self.nodes = [Node(np.zeros((3,1)), -1, 0, 0)]
@@ -176,10 +177,10 @@ class PathPlanner:
         return
 
     #Functions required for RRT
-    def sample_map_space(self, uniform: bool) -> np.ndarray:
+    def sample_map_space(self) -> np.ndarray:
         #Return an [x,y] coordinate to drive the robot towards
         self.num_samples += 1
-        if uniform:
+        if self.uniform_sampling:
           random_x = float(np.random.uniform(self.bounds[0,0], self.bounds[0,1]))
           random_y = float(np.random.uniform(self.bounds[1,0], self.bounds[1,1]))
           return np.array([[random_x], [random_y]])
@@ -233,18 +234,25 @@ class PathPlanner:
 
         return vel, rot_vel
             
-    def trajectory_rollout(self, node: Node, vel: float, rot_vel: float):
+    def trajectory_rollout(self, node: Node, vel: float, rot_vel: float) -> np.ndarray:
         # Given your chosen velocities determine the trajectory of the robot for your given timestep
         # The returned trajectory should be a series of points to check for collisions
         rollout = np.zeros((3, self.num_substeps))
         rollout[:,0] = node.robot_pose.flatten()
         
-        for i in range(1,self.num_substeps):
-            # Forward Euler
-            last_pos = rollout[:,i-1]
-            q_dot = unicycle_model(vel=vel, rot_vel=rot_vel, theta=last_pos[2])
-            rollout[:,i] = last_pos + (q_dot * self.timestep).flatten()
-
+        if self.point_and_shoot:
+            rollout[:,1] = rollout[:,0] + np.array([0, 0, rot_vel * self.timestep * self.num_substeps])
+            for i in range(2,self.num_substeps):
+                # Forward Euler
+                last_pos = rollout[:,i-1]
+                q_dot = unicycle_model(vel=vel, rot_vel=0, theta=last_pos[2])
+                rollout[:,i] = last_pos + (q_dot * self.timestep).flatten()
+        else:
+          for i in range(1,self.num_substeps):
+              # Forward Euler
+              last_pos = rollout[:,i-1]
+              q_dot = unicycle_model(vel=vel, rot_vel=rot_vel, theta=last_pos[2])
+              rollout[:,i] = last_pos + (q_dot * self.timestep).flatten()
         return rollout
     
     def point_to_cell(self, point: np.ndarray) -> np.ndarray:
@@ -313,7 +321,7 @@ class PathPlanner:
         for i in range(ITERATIONS): 
             
             #Sample map space
-            point = self.sample_map_space(uniform=self.uniform_sampling)
+            point = self.sample_map_space()
             if not self.headless:
                 self.window.add_point(point[:2].flatten(), radius = 2, color=(0,0,255))
 
@@ -350,6 +358,12 @@ class PathPlanner:
             #Check if goal has been reached
             if np.linalg.norm(self.nodes[-1].robot_pose[:2] - self.goal_point) < self.stopping_dist:
                 print("Goal Reached!")
+                # Return the path
+                while new_node.parent_id > -1:
+                    self.window.add_point(new_node.robot_pose[:2].flatten(), radius=2, color=(255,0,0))
+                    self.window.add_line(self.nodes[new_node.parent_id].robot_pose[:2].flatten(), new_node.robot_pose[:2].flatten(), width=2, color=(255,0,0))
+                    new_node = self.nodes[new_node.parent_id]
+                # time.sleep(20)
                 return self.nodes
     
     def rrt_star_planning(self):
@@ -378,10 +392,10 @@ class PathPlanner:
         return self.nodes
     
     def recover_path(self, node_id = -1):
-        path = [self.nodes[node_id].point]
+        path = [self.nodes[node_id].robot_pose]
         current_node_id = self.nodes[node_id].parent_id
         while current_node_id > -1:
-            path.append(self.nodes[current_node_id].point)
+            path.append(self.nodes[current_node_id].robot_pose)
             current_node_id = self.nodes[current_node_id].parent_id
         path.reverse()
         return path
@@ -407,7 +421,13 @@ def main():
     stopping_dist = 0.5 #m
 
     #RRT precursor
-    path_planner = PathPlanner(map_filename, map_setings_filename, goal_point, stopping_dist, headless=False, uniform_sampling=False)
+    path_planner = PathPlanner(map_filename, 
+                               map_setings_filename, 
+                               goal_point, 
+                               stopping_dist, 
+                               headless=False, 
+                               uniform_sampling=False,
+                               point_and_shoot=True)
     nodes = path_planner.rrt_planning()
     node_path_metric = np.hstack(path_planner.recover_path())
 
