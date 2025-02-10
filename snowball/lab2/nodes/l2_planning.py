@@ -53,17 +53,9 @@ def update_children(nodes: list[Node], node_id: int):
         return
 
 def cost_of_trajectory(trajectory: np.ndarray) -> float:
-    #Given a trajectory calculate the cost of the trajectory
-    cost = 0
-    for i in range(1, trajectory.shape[1]):
-        prev_pose = trajectory[:, i-1]
-        cur_pose = trajectory[:, i]
-        angle_to_target = np.arctan2(prev_pose[1] - cur_pose[1], prev_pose[0] - cur_pose[0])
-        cost += np.linalg.norm(trajectory[:2, i] - trajectory[:2, i-1])
-        # # TODO: should we include rotation cost?
-        # angle_diff = np.arctan2(np.sin(angle_to_target - cur_pose[2]), np.cos(angle_to_target - cur_pose[2]))
-        # cost += 1.5*abs(angle_diff)
-    return cost
+    diffs = np.diff(trajectory[:2, :], axis=1)
+    segment_costs = np.linalg.norm(diffs, axis=0)
+    return segment_costs.sum()
 
 class SlidingWindowSampler:
     def __init__(self, map_size, window_size, overlap=0.5, total_samples=100, switch=False):
@@ -266,14 +258,13 @@ class PathPlanner:
               rollout[:,i] = last_pos + (q_dot * self.timestep).flatten()
         return rollout
     
-    def point_to_cell(self, point: np.ndarray) -> np.ndarray:
-        #Convert a series of [x,y] points in the map to the indices for the corresponding cell in the occupancy map
-        #point is a 2 by N matrix of points of interest
-        pixel_coords = np.zeros_like(point)
-        for i in range(point.shape[1]):
-            pixel_coords[0,i] = (point[0,i])/self.resolution + self.origin_pixel[0] 
-            pixel_coords[1,i] = self.origin_pixel[1] - (point[1,i])/self.resolution
-        return pixel_coords
+    def point_to_cell(self, points: np.ndarray) -> np.ndarray:
+        # points is expected to be a 2 x N array.
+        pixel_coords = np.empty_like(points)
+        pixel_coords[0, :] = points[0, :] / self.resolution + self.origin_pixel[0]
+        pixel_coords[1, :] = self.origin_pixel[1] - points[1, :] / self.resolution
+        return pixel_coords.astype(np.int32)
+
 
     def points_to_robot_circle(self, points: np.ndarray) -> np.ndarray:
         #Convert a series of [x,y] points to robot map footprints for collision detection
