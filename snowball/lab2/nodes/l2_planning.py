@@ -9,8 +9,7 @@ from math import cos, sin, acos, pi
 import random
 import matplotlib.pyplot as plt
 from typing import Tuple, List
-import heapq
-
+import time
 
 NODE_CLOSENESS_TOL = 0.01
 ITERATIONS = 13000
@@ -142,7 +141,9 @@ class PathPlanner:
 
         # Sampler
         self.uniform_sampling = uniform_sampling
-        self.sampler = SlidingWindowSampler((50,60), (10, 10), overlap=0.2, total_samples=int(2000), switch=False)
+        self.sampler = SlidingWindowSampler((50,60), (10, 10), overlap=0.2, total_samples=int(2000))
+        self.sampler2 = SlidingWindowSampler((50,60), (10, 10), overlap=0.25, total_samples=int(2000), switch=True)
+        self.sampler3 = SlidingWindowSampler((50,60), (2, 2), overlap=0.15, total_samples=int(2000))
 
         #Robot information
         self.robot_radius = 0.22 #m
@@ -184,8 +185,18 @@ class PathPlanner:
           random_x = float(np.random.uniform(self.bounds[0,0], self.bounds[0,1]))
           random_y = float(np.random.uniform(self.bounds[1,0], self.bounds[1,1]))
           return np.array([[random_x], [random_y]])
-        else:
-          return self.sampler.sample()
+        else: # Smarter sampling, only works on the willowgarage map TODO: generalize
+          if self.num_samples < self.sampler.total_samples:
+            return self.sampler.sample() + np.array([[-5], [15]])
+          elif self.num_samples < self.sampler.total_samples + 500:
+              # sample in the goal region
+              random_x = float(np.random.uniform(self.goal_point[0] - 7.5,  self.goal_point[0] + 2.5))
+              random_y = float(np.random.uniform(self.goal_point[1] - 3, self.goal_point[1] + 3))
+              return np.array([[random_x], [random_y]]) 
+          elif self.num_samples < self.sampler2.total_samples + self.sampler.total_samples + 500:
+              return self.sampler2.sample() + np.array([[-5], [15]])
+          else:
+              return self.sampler3.sample() + np.array([[-5], [15]])
     
     def is_duplicate(self, pose: np.ndarray) -> bool:
         #Check if point is a duplicate of an already existing node
@@ -363,7 +374,7 @@ class PathPlanner:
                     self.window.add_point(new_node.robot_pose[:2].flatten(), radius=2, color=(255,0,0))
                     self.window.add_line(self.nodes[new_node.parent_id].robot_pose[:2].flatten(), new_node.robot_pose[:2].flatten(), width=2, color=(255,0,0))
                     new_node = self.nodes[new_node.parent_id]
-                # time.sleep(20)
+                time.sleep(20)
                 return self.nodes
     
     def rrt_star_planning(self):
