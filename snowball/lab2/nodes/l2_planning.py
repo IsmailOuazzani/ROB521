@@ -53,9 +53,6 @@ def update_children(nodes: list[Node], node_id: int):
         queue = [root]
         while queue:
             node = queue.pop(0)
-            print(f"node id: {node_id}")
-            print(f"node children: {node.children_ids}")
-            print(f"queue: {queue}")
             for child_id in node.children_ids:
                 child: Node = nodes[child_id]
                 child.cost = node.cost + child.cost_from_parent
@@ -168,8 +165,15 @@ class PathPlanner:
         self.headless = headless
         if not self.headless:
             #Pygame window for visualization
+            #Pygame window for visualization
+            # visualization_scale = 1000 / self.occupancy_map.shape[1]
+            # self.window = pygame_utils.PygameWindow(
+            #     "Path Planner", map_filename, (self.occupancy_map.shape[1]*visualization_scale, 
+            #                                 self.occupancy_map.shape[0]*visualization_scale), 
+            #                                 [self.occupancy_map.shape[1], self.occupancy_map.shape[0]], self.map_settings_dict, self.goal_point, self.stopping_dist)
             self.window = pygame_utils.PygameWindow(
-                map_filename, (1000, 1000), self.occupancy_map.shape, self.map_settings_dict, self.goal_point, self.stopping_dist)
+                    map_filename, (1000, 1000), self.occupancy_map.shape, self.map_settings_dict, self.goal_point, self.stopping_dist)
+            
         return
 
     #Functions required for RRT
@@ -358,7 +362,7 @@ class PathPlanner:
         #point is a 2 by 1 point
         # diregard theta
         dist = np.linalg.norm(node_i.robot_pose - point_f.flatten())
-        vel = self.vel_max
+        vel = self.vel_max * 0.1
         final_t = dist / vel
         rollout = np.zeros((3, int(final_t / self.timestep)))
         rollout[0,:] = np.linspace(node_i.robot_pose[0], point_f[0], int(final_t / self.timestep)).flatten()
@@ -430,14 +434,14 @@ class PathPlanner:
                 if not self.check_if_duplicate(trajectory_o[:,-1]):
                     cost_of_trajectory = self.cost_of_trajectory(trajectory_o)
                     cost_to_come = closest_node.cost + cost_of_trajectory
-                    new_node = Node(robot_pose=trajectory_o[:,-1].reshape(3,1), parent_id=closest_node_id, cost=cost_to_come, cost_from_parent=cost_of_trajectory)
+                    new_node = Node(robot_pose=trajectory_o[:,-1].reshape(3,1), parent_id=closest_node_id, cost=cost_to_come, cost_from_parent=cost_of_trajectory, children_ids=[])
                     closest_node.children_ids.append(len(self.nodes))
-
+                    # Update graph
+                    self.nodes.append(new_node)
                     if not self.headless:
                         for i in range(1, trajectory_o.shape[1]):
                             self.window.add_point(trajectory_o[:2,i], radius=2, color=(0,255,0))
-                    # Update graph
-                    self.nodes.append(new_node)
+
                     break
             
             # time.sleep(0.1)
@@ -454,7 +458,7 @@ class PathPlanner:
                     # plt.plot(pizel_coords[0], pizel_coords[1], 'gx')
                     # plot trajectory
                     
-                # time.sleep(20)
+                time.sleep(20)
                 plt.show()
                 return self.nodes
             
@@ -490,11 +494,14 @@ class PathPlanner:
                     robot_pose=trajectory_o[:,-1].reshape(3,1),
                     parent_id=closest_node_id,
                     cost=self.nodes[closest_node_id].cost + cost_from_parent,
-                    cost_from_parent=cost_from_parent
+                    cost_from_parent=cost_from_parent,
+                    children_ids=[]
                 )
                 closest_node.children_ids.append(new_node_id)
                 
                 self.nodes.append(new_node)
+                # print(f"childrens of last node: {self.nodes[-1].children_ids}")
+
                 ball_radius = self.ball_radius()
                 closest_nodes_ids = self.nodes_within_radius(point=new_node.robot_pose[:2], radius=ball_radius)
                 # plot trajectory
@@ -503,7 +510,7 @@ class PathPlanner:
                 #         self.window.add_point(trajectory_o[:2,i], radius=2, color=(0,255,0))
                 # print(f"Inital parent: {new_node.parent_id}")
                 for node_id in closest_nodes_ids:
-                    print("rewiring")
+                    # print("rewiring")
                     if node_id == closest_node_id:
                         continue
                     node = self.nodes[node_id]
@@ -527,7 +534,7 @@ class PathPlanner:
 
                 #Close node rewire
                 for node_id in closest_nodes_ids:
-                    print("rewiring edge")
+                    # print("rewiring edge")
                     node = self.nodes[node_id]
                     trajectory_o = self.connect_node_to_point(new_node, node.robot_pose[:2])
                     trajectory_o[2,trajectory_o.shape[1]-1] = node.robot_pose[2]
@@ -542,9 +549,9 @@ class PathPlanner:
                         node.cost_from_parent = cost_from_parent
                         node.cost = cost
                         new_node.children_ids.append(node_id)
-                        print(f"rewired edge from {new_node_id} to {node_id}")
+                        # print(f"rewired edge from {new_node_id} to {node_id}")
                         update_children(nodes=self.nodes, node_id=node_id) 
-                        print(f"done")
+                        # print(f"done")
                         # plot trajectory
                         # if not self.headless:
                         #     for i in range(1, trajectory_o.shape[1]):
@@ -608,8 +615,8 @@ def main():
     #RRT precursor
     path_planner = PathPlanner(map_filename, map_setings_filename, goal_point, stopping_dist, headless=False)
     # path_planner = PathPlanner(map_filename, map_setings_filename, goal_point, stopping_dist, headless=True)
-    nodes = path_planner.rrt_star_planning()
-    # nodes = path_planner.rrt_planning()
+    # nodes = path_planner.rrt_star_planning()
+    nodes = path_planner.rrt_planning()
     print("Path Length: ", len(nodes))
     print(nodes[0].robot_pose)
     print(nodes[-1].robot_pose)
