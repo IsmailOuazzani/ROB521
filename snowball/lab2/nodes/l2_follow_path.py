@@ -22,10 +22,10 @@ from skimage.draw import disk
 
 TRANS_GOAL_TOL = .2  # m, tolerance to consider a goal complete
 ROT_GOAL_TOL = .3  # rad, tolerance to consider a goal complete
-TRANS_VEL_OPTS = [0.025 , 0.075, 0.15] # m/s, max of real robot is .26
-ROT_VEL_OPTS = np.linspace(-1.3, 1.3, 31)  # rad/s, max of real robot is 1.82
+TRANS_VEL_OPTS = [0.26] # m/s, max of real robot is .26
+ROT_VEL_OPTS = np.linspace(-1, 1, 15)  # rad/s, max of real robot is 1.82
 CONTROL_RATE = 5  # Hz, how frequently control signals are sent
-CONTROL_HORIZON = 4  # seconds. if this is set too high and INTEGRATION_DT is too low, code will take a long time to run!
+CONTROL_HORIZON = 5  # seconds. if this is set too high and INTEGRATION_DT is too low, code will take a long time to run!
 INTEGRATION_DT = .2  # s, delta t to propagate trajectories forward by
 COLLISION_RADIUS = 0.225  # m, radius from base_link to use for collisions, min of 0.2077 based on dimensions of .281 x .306
 ROT_DIST_MULT = .1  # multiplier to change effect of rotational distance in choosing correct control
@@ -76,9 +76,7 @@ class PathFollower():
         self.map_resolution = round(map.info.resolution, 5)
         self.map_origin = -utils.se2_pose_from_pose(map.info.origin)  # negative because of weird way origin is stored
         self.map_bounds = np.array([map.info.height, map.info.width])
-        print(self.map_origin)
         self.map_nonzero_idxes = np.argwhere(self.map_np)
-        print(map)
 
 
         # collisions
@@ -165,6 +163,9 @@ class PathFollower():
             self.update_pose()
             self.check_and_update_goal()
 
+            dist_to_goal = np.linalg.norm(self.pose_in_map_np[:2] - self.cur_goal[:2])
+
+            self.horizon_timesteps = min(int(np.ceil(CONTROL_HORIZON / INTEGRATION_DT)), int((dist_to_goal/0.26)/INTEGRATION_DT))
             # start trajectory rollout algorithm
             local_paths = np.zeros([self.horizon_timesteps + 1, self.num_opts, 3])
             # setting all of the first points in the local paths to the current pose
@@ -187,7 +188,6 @@ class PathFollower():
             best_opt = None
             for opt in range(local_paths_pixels.shape[1]):
                 if self.collision_detected(local_paths_pixels[:, opt, :]):
-                    print("Collision detected for option {opt}, removing from valid options.".format(opt=opt))
                     bad_opts.append(opt)
                     continue
                 # Calculate the distance to the closest obstacle
