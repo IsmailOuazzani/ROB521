@@ -185,6 +185,8 @@ class OccupancyGripMap:
         # cc is the x values and rr is the y values
         # cc is sorted from closest to x_start to x_end
 
+        # TODO: weighted alpha or delta based on distance from robot
+
         for j in range(len(rr) - 1):
             r = rr[j]
             c = cc[j]
