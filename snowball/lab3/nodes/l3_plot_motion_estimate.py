@@ -25,10 +25,11 @@ def plot(bag):
     f, axes = plt.subplots(3, 1, sharex=True)
     for k in range(3):
         for key, val in data.items():
-            axes[k].plot(val["time"], val["data"][:, k], label=key)
-            axes[k].set_ylabel(data_labels[k])
-            axes[k].legend()
-            axes[k].grid()
+            if len(val["time"]) > 0:
+                axes[k].plot(val["time"], val["data"][:, k], label=key)
+                axes[k].set_ylabel(data_labels[k])
+                axes[k].legend()
+                axes[k].grid()
     axes[2].set_xlabel("time (s)")
     
     plt.show()
