@@ -27,6 +27,7 @@ class wheelRadiusEstimator():
         self.right_encoder_prev = None
         self.del_left_encoder = 0
         self.del_right_encoder = 0
+        self.denom = 0
         self.isMoving = False #Moving or not moving
         self.lock = threading.Lock()
 
@@ -64,20 +65,23 @@ class wheelRadiusEstimator():
         self.lock.release()
         return
 
+    def ticks2rad(encoder):
+        return encoder*2*np.pi/TICKS_PER_ROTATION
+
     def startStopCallback(self, msg):
         input_velocity_mag = np.linalg.norm(np.array([msg.linear.x, msg.linear.y, msg.linear.z]))
+        self.denom += self.ticks2rad(self.del_left_encoder) + self.ticks2rad(self.del_right_encoder)
         if self.isMoving is False and np.absolute(input_velocity_mag) > 0:
             self.isMoving = True #Set state to moving
             print('Starting Calibration Procedure')
 
         elif self.isMoving is True and np.isclose(input_velocity_mag, 0):
             self.isMoving = False #Set the state to stopped
-
-            # # YOUR CODE HERE!!!
-            # Calculate the radius of the wheel based on encoder measurements
-
-            # radius = ##
-            # print('Calibrated Radius: {} m'.format(radius))
+            try:
+                radius = 2 * DRIVEN_DISTANCE / self.denom
+                print('Calibrated Radius: {} m'.format(radius))
+            except ZeroDivisionError:
+                print("Error: Denominator is zero! Calibration failed.")
 
             #Reset the robot and calibration routine
             self.lock.acquire()
@@ -89,9 +93,7 @@ class wheelRadiusEstimator():
             reset_msg = Empty()
             self.reset_pub.publish(reset_msg)
             print('Resetted the robot to calibrate again!')
-
         return
-
 
 if __name__ == '__main__':
     Estimator = wheelRadiusEstimator() #create instance

@@ -29,6 +29,7 @@ class wheelBaselineEstimator():
         self.right_encoder_prev = None
         self.del_left_encoder = 0
         self.del_right_encoder = 0
+        self.nominator = 0
         self.isMoving = False #Moving or not moving
         self.lock = threading.Lock()
 
@@ -66,20 +67,19 @@ class wheelBaselineEstimator():
         self.lock.release()
         return
 
+    def ticks2rad(encoder):
+        return encoder*2*np.pi/TICKS_PER_ROTATION
+    
     def startStopCallback(self, msg):
+        self.nominator += self.ticks2rad(self.del_left_encoder) + self.ticks2rad(self.del_right_encoder)
         if self.isMoving is False and np.absolute(msg.angular.z) > 0:
             self.isMoving = True #Set state to moving
             print('Starting Calibration Procedure')
 
         elif self.isMoving is True and np.isclose(msg.angular.z, 0):
             self.isMoving = False #Set the state to stopped
-
-            # # YOUR CODE HERE!!!
-            # Calculate the radius of the wheel based on encoder measurements
-
-            # separation = ##
-            # print('Calibrated Separation: {} m'.format(separation))
-
+            separation = WHEEL_RADIUS * self.nominator/(4 * NUM_ROTATIONS * np.pi)
+            print('Calibrated Separation: {} m'.format(separation))
             #Reset the robot and calibration routine
             self.lock.acquire()
             self.left_encoder_prev = None
