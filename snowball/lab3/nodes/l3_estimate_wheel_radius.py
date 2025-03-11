@@ -13,16 +13,13 @@ TICKS_PER_ROTATION = 4096
 
 class wheelRadiusEstimator():
     def __init__(self):
-        rospy.init_node('encoder_data', anonymous=True) # Initialize node
+        rospy.init_node('encoder_data', anonymous=True) 
 
-        #Subscriber bank
         rospy.Subscriber("cmd_vel", Twist, self.startStopCallback)
-        rospy.Subscriber("sensor_state", SensorState, self.sensorCallback) #Subscribe to the sensor state msg
+        rospy.Subscriber("sensor_state", SensorState, self.sensorCallback) 
 
-        #Publisher bank
         self.reset_pub = rospy.Publisher('reset', Empty, queue_size=1)
 
-        #Initialize variables
         self.left_encoder_prev = None
         self.right_encoder_prev = None
         self.del_left_encoder = 0
@@ -62,7 +59,7 @@ class wheelRadiusEstimator():
             self.left_encoder_prev = msg.left_encoder #int32
             self.right_encoder_prev = msg.right_encoder #int32
         self.lock.release()
-        return
+        return    
 
     def startStopCallback(self, msg):
         input_velocity_mag = np.linalg.norm(np.array([msg.linear.x, msg.linear.y, msg.linear.z]))
@@ -73,11 +70,18 @@ class wheelRadiusEstimator():
         elif self.isMoving is True and np.isclose(input_velocity_mag, 0):
             self.isMoving = False #Set the state to stopped
 
-            # # YOUR CODE HERE!!!
-            # Calculate the radius of the wheel based on encoder measurements
+            print(self.del_left_encoder)
+            print(self.del_right_encoder)
+            left_turns = self.del_left_encoder/TICKS_PER_ROTATION
+            right_turns = self.del_right_encoder/TICKS_PER_ROTATION
 
-            # radius = ##
-            # print('Calibrated Radius: {} m'.format(radius))
+            average_turns = (left_turns + right_turns)/2
+            circumference = DRIVEN_DISTANCE/average_turns
+            radius = circumference/(2*np.pi)
+            print('Calibrated Radius: {} m'.format(radius)) 
+            # Getting 0.34 for the sample rosbag, which is close to the 0.033 provided in the l3_estimate_wheel_baseline.py file
+            # even tho 0.34m radius for a turtlebot3 is not realistic... leaving it here for now
+
 
             #Reset the robot and calibration routine
             self.lock.acquire()

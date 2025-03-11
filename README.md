@@ -17,9 +17,32 @@ PYTHONPATH=$PWD pytest
 
 ## LAB 3
 
-### TASK 2 - Simulation
+### Simulation
 
-#### Simulation using the rosbag
+#### Task 1 - Vehicle Calibration 
+4 terminals
+
+First terminal:
+```
+catkin_make
+source devel/setup.bash
+roscore
+```
+
+Second terminal:
+```
+source devel/setup.bash
+rosrun rob521_lab3 l3_estimate_wheel_radius.py
+```
+
+Fourth terminal:
+```
+source devel/setup.bash
+roscd rob521_lab3/  
+rosbag play sample_data.bag 
+```
+
+#### TASK 2 - Estimate Robot Motion using Wheel Encoder
 3 terminals
 
 run roscore
@@ -41,9 +64,8 @@ roscd rob521_lab3/
 rosbag play sample_data.bag --pause
 ```
 
-### TASK 3 - Simulation
+#### TASK 3 - Construct an Occupancy Grid Map 
 
-#### Simulation using gazebo
 Within the container, in `/home/catkin_ws`, run:
 ```
 catkin_make
