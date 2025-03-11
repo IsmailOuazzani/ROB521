@@ -16,7 +16,6 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Pose, Twist, TransformStamped, Transform, Quaternion
 from std_msgs.msg import Empty
 
-
 from utils import convert_pose_to_tf, euler_from_ros_quat, ros_quat_from_euler
 
 

@@ -40,3 +40,28 @@ source devel/setup.bash
 roscd rob521_lab3/  
 rosbag play sample_data.bag --pause
 ```
+
+### TASK 3 - Simulation
+
+#### Simulation using gazebo
+Within the container, in `/home/catkin_ws`, run:
+```
+catkin_make
+rospack profile
+source devel/setup.bash
+```
+Open a new terminal with `docker exec -it` and run:
+```
+source devel/setup.bash
+roslaunch rob521_lab3 mapping_rviz.launch
+```
+In a third terminal,  with `docker exec -it`  run:
+```
+source devel/setup.bash
+rosrun rob521_lab3 l3_mapping.py
+```
+
+If you run into an error importing `skimage`, run: 
+```
+pip install --upgrade numpy scikit-image
+```
