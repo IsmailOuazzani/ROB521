@@ -10,7 +10,7 @@ from geometry_msgs.msg import Twist
 INT32_MAX = 2**31
 NUM_ROTATIONS = 3 
 TICKS_PER_ROTATION = 4096
-WHEEL_RADIUS = 0.066 / 2 #In meters
+WHEEL_RADIUS = 0.0651 / 2 #In meters
 
 
 class wheelBaselineEstimator():
@@ -29,7 +29,6 @@ class wheelBaselineEstimator():
         self.right_encoder_prev = None
         self.del_left_encoder = 0
         self.del_right_encoder = 0
-        self.nominator = 0
         self.isMoving = False #Moving or not moving
         self.lock = threading.Lock()
 
@@ -66,19 +65,16 @@ class wheelBaselineEstimator():
             self.right_encoder_prev = msg.right_encoder #int32
         self.lock.release()
         return
-
-    def ticks2rad(encoder):
-        return encoder*2*np.pi/TICKS_PER_ROTATION
     
     def startStopCallback(self, msg):
-        self.nominator += self.ticks2rad(self.del_left_encoder) + self.ticks2rad(self.del_right_encoder)
         if self.isMoving is False and np.absolute(msg.angular.z) > 0:
             self.isMoving = True #Set state to moving
             print('Starting Calibration Procedure')
 
         elif self.isMoving is True and np.isclose(msg.angular.z, 0):
-            self.isMoving = False #Set the state to stopped
-            separation = WHEEL_RADIUS * self.nominator/(4 * NUM_ROTATIONS * np.pi)
+            self.isMoving = False
+            turns_diff = (self.del_right_encoder - self.del_left_encoder)/TICKS_PER_ROTATION
+            separation = WHEEL_RADIUS * abs(turns_diff)/NUM_ROTATIONS
             print('Calibrated Separation: {} m'.format(separation))
             #Reset the robot and calibration routine
             self.lock.acquire()

@@ -8,7 +8,7 @@ from std_msgs.msg import Empty
 from geometry_msgs.msg import Twist
 
 INT32_MAX = 2**31
-DRIVEN_DISTANCE = 0.75 #in meters
+DRIVEN_DISTANCE = 0.60 #in meters
 TICKS_PER_ROTATION = 4096
 
 class wheelRadiusEstimator():
@@ -65,24 +65,17 @@ class wheelRadiusEstimator():
         self.lock.release()
         return
 
-    def ticks2rad(encoder):
-        return encoder*2*np.pi/TICKS_PER_ROTATION
-
     def startStopCallback(self, msg):
         input_velocity_mag = np.linalg.norm(np.array([msg.linear.x, msg.linear.y, msg.linear.z]))
-        self.denom += self.ticks2rad(self.del_left_encoder) + self.ticks2rad(self.del_right_encoder)
         if self.isMoving is False and np.absolute(input_velocity_mag) > 0:
             self.isMoving = True #Set state to moving
             print('Starting Calibration Procedure')
 
         elif self.isMoving is True and np.isclose(input_velocity_mag, 0):
-            self.isMoving = False #Set the state to stopped
-            try:
-                radius = 2 * DRIVEN_DISTANCE / self.denom
-                print('Calibrated Radius: {} m'.format(radius))
-            except ZeroDivisionError:
-                print("Error: Denominator is zero! Calibration failed.")
-
+            self.isMoving = False
+            average_turns = (self.del_left_encoder + self.del_right_encoder)/(2*TICKS_PER_ROTATION)
+            radius = DRIVEN_DISTANCE/(2*np.pi*average_turns)
+            print('Calibrated Radius: {} m'.format(radius)) 
             #Reset the robot and calibration routine
             self.lock.acquire()
             self.left_encoder_prev = None
