@@ -6,6 +6,7 @@ docker build -t rob521 .
 
 To run the container:
 ```
+xhost +
 docker compose run --rm rob521
 ```
 
@@ -71,17 +72,31 @@ Within the container, in `/home/catkin_ws`, run:
 catkin_make
 rospack profile
 source devel/setup.bash
+roslaunch rob521_lab3 mapping_rviz.launch
+
 ```
 Open a new terminal with `docker exec -it` and run:
 ```
 source devel/setup.bash
-roslaunch rob521_lab3 mapping_rviz.launch
+roslaunch rob521_lab3 turtlebot3_world.launch
 ```
-In a third terminal,  with `docker exec -it`  run:
+In a second terminal,  with `docker exec -it`  run:
 ```
 source devel/setup.bash
 rosrun rob521_lab3 l3_mapping.py
 ```
+In a third terminal,  with `docker exec -it`  run:
+```
+source devel/setup.bash
+roslaunch turtlebot3_teleop turtlebot3_teleop_key.launch
+```
+In a 4th terminal,  with `docker exec -it`  run:
+```
+source devel/setup.bash
+rosrun rob521_lab3 l3_mapping.py
+```
+
+
 
 If you run into an error importing `skimage`, run: 
 ```
