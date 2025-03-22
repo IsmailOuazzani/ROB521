@@ -8,7 +8,7 @@ from std_msgs.msg import Empty
 from geometry_msgs.msg import Twist
 
 INT32_MAX = 2**31
-DRIVEN_DISTANCE = 0.75 #in meters
+DRIVEN_DISTANCE = 0.60 #in meters
 TICKS_PER_ROTATION = 4096
 
 class wheelRadiusEstimator():
@@ -59,7 +59,7 @@ class wheelRadiusEstimator():
             self.left_encoder_prev = msg.left_encoder #int32
             self.right_encoder_prev = msg.right_encoder #int32
         self.lock.release()
-        return    
+        return
 
     def startStopCallback(self, msg):
         input_velocity_mag = np.linalg.norm(np.array([msg.linear.x, msg.linear.y, msg.linear.z]))
@@ -68,21 +68,10 @@ class wheelRadiusEstimator():
             print('Starting Calibration Procedure')
 
         elif self.isMoving is True and np.isclose(input_velocity_mag, 0):
-            self.isMoving = False #Set the state to stopped
-
-            print(self.del_left_encoder)
-            print(self.del_right_encoder)
-            left_turns = self.del_left_encoder/TICKS_PER_ROTATION
-            right_turns = self.del_right_encoder/TICKS_PER_ROTATION
-
-            average_turns = (left_turns + right_turns)/2
-            circumference = DRIVEN_DISTANCE/average_turns
-            radius = circumference/(2*np.pi)
+            self.isMoving = False
+            average_turns = (self.del_left_encoder + self.del_right_encoder)/(2*TICKS_PER_ROTATION)
+            radius = DRIVEN_DISTANCE/(2*np.pi*average_turns)
             print('Calibrated Radius: {} m'.format(radius)) 
-            # Getting 0.34 for the sample rosbag, which is close to the 0.033 provided in the l3_estimate_wheel_baseline.py file
-            # even tho 0.34m radius for a turtlebot3 is not realistic... leaving it here for now
-
-
             #Reset the robot and calibration routine
             self.lock.acquire()
             self.left_encoder_prev = None
@@ -93,9 +82,7 @@ class wheelRadiusEstimator():
             reset_msg = Empty()
             self.reset_pub.publish(reset_msg)
             print('Resetted the robot to calibrate again!')
-
         return
-
 
 if __name__ == '__main__':
     Estimator = wheelRadiusEstimator() #create instance
