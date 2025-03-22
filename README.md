@@ -102,3 +102,16 @@ If you run into an error importing `skimage`, run:
 ```
 pip install --upgrade numpy scikit-image
 ```
+
+
+## Lab 4
+
+### Task 2
+Within the container, in `/home/catkin_ws`, run:
+```
+catkin_make
+rospack profile
+source devel/setup.bash
+cd src/snowball
+make lab4-task2
+```
